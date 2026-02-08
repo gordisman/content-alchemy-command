@@ -1,0 +1,52 @@
+name: Multi-Project Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    
+    # This matrix allows us to deploy to Gord AND any future clients in parallel
+    strategy:
+      matrix:
+        include:
+          - project_id: cac-prod-gord
+            secret_name: FIREBASE_SERVICE_ACCOUNT_CAC_PROD_GORD
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Swap Environment for ${{ matrix.project_id }}
+        shell: bash
+        run: |
+          # The automation needs to know the correct API keys for this specific project
+          # We check for a matching .env file in the repo (or we use a secret)
+          if [ "${{ matrix.project_id }}" == "cac-prod-gord" ]; then
+            node scripts/switch-env.js prod
+          fi
+
+      - name: Build Application
+        run: npm run build
+
+      - name: Deploy to Firebase (${{ matrix.project_id }})
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets[matrix.secret_name] }}"
+          projectId: ${{ matrix.project_id }}
+          channelId: live
