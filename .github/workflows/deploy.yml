@@ -17,6 +17,7 @@ jobs:
         include:
           - project_id: cac-prod-gord
             secret_name: FIREBASE_SERVICE_ACCOUNT_CAC_PROD_GORD
+            env_secret: ENV_CONFIG_CAC_PROD_GORD
 
     steps:
       - name: Checkout Repository
@@ -31,14 +32,12 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Swap Environment for ${{ matrix.project_id }}
+      - name: Setup Environment for ${{ matrix.project_id }}
         shell: bash
         run: |
-          # The automation needs to know the correct API keys for this specific project
-          # We check for a matching .env file in the repo (or we use a secret)
-          if [ "${{ matrix.project_id }}" == "cac-prod-gord" ]; then
-            node scripts/switch-env.js prod
-          fi
+          # Reconstruct the .env.local file from GitHub Secrets since the file is gitignored
+          echo "${{ secrets[matrix.env_secret] }}" > .env.local
+          echo "✅ .env.local created from secret: ${{ matrix.env_secret }}"
 
       - name: Build Application
         run: npm run build
