@@ -1,0 +1,363 @@
+{
+  "post_title": {
+    "type": "string",
+    "required": false,
+    "description": "Independent post title, initially copied from parent idea master_title"
+  },
+  "idea_id": {
+    "type": "string",
+    "required": false,
+    "description": "Reference to parent Idea"
+  },
+  "is_direct_entry": {
+    "type": "boolean",
+    "required": false,
+    "default": false
+  },
+  "direct_entry_sequence": {
+    "type": "number",
+    "required": false
+  },
+  "platform": {
+    "type": "string",
+    "required": true,
+    "enum": [
+      "instagram",
+      "youtube",
+      "fb_page",
+      "fb_group",
+      "linkedin",
+      "x",
+      "tiktok",
+      "email",
+      "substack",
+      "community"
+    ]
+  },
+  "definitive_pillar": {
+    "type": "string",
+    "required": false
+  },
+  "applied_allocation_set": {
+    "type": "string",
+    "required": false
+  },
+  "body": {
+    "type": "string",
+    "required": false
+  },
+  "cta": {
+    "type": "string",
+    "required": false
+  },
+  "action_notes": {
+    "type": "string",
+    "required": false
+  },
+  "post_audio_memo": {
+    "type": "string",
+    "required": false
+  },
+  "post_audio_memo_duration": {
+    "type": "number",
+    "required": false
+  },
+  "status": {
+    "type": "string",
+    "required": false,
+    "default": "draft",
+    "enum": [
+      "draft",
+      "scheduled",
+      "published",
+      "overdue"
+    ]
+  },
+  "publish_date": {
+    "type": "timestamp",
+    "required": false
+  },
+  "display_order": {
+    "type": "number",
+    "required": false,
+    "default": 0
+  },
+  "verified": {
+    "type": "boolean",
+    "required": false,
+    "default": false
+  },
+  "alert_silenced": {
+    "type": "boolean",
+    "required": false,
+    "default": false
+  },
+  "archived": {
+    "type": "boolean",
+    "required": false,
+    "default": false
+  },
+  "youtube_playlists": {
+    "type": "array",
+    "required": false
+  },
+  "youtube_seo_title": {
+    "type": "string",
+    "required": false
+  },
+  "youtube_seo_description": {
+    "type": "string",
+    "required": false
+  },
+  "youtube_seo_tags": {
+    "type": "string",
+    "required": false
+  },
+  "yt_type": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "video",
+      "short",
+      "podcast",
+      "live_stream",
+      "community_post"
+    ]
+  },
+  "yt_thumbnail_brief": {
+    "type": "string",
+    "required": false
+  },
+  "yt_pinned_comment": {
+    "type": "string",
+    "required": false
+  },
+  "yt_related_video_link": {
+    "type": "string",
+    "required": false
+  },
+  "yt_audio_notes": {
+    "type": "string",
+    "required": false
+  },
+  "yt_output_notes": {
+    "type": "string",
+    "required": false
+  },
+  "fb_engagement_question": {
+    "type": "string",
+    "required": false
+  },
+  "fb_privacy_audience": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "public",
+      "friends",
+      "specific_group"
+    ]
+  },
+  "fb_life_event": {
+    "type": "boolean",
+    "required": false,
+    "default": false
+  },
+  "fb_comment_strategy": {
+    "type": "string",
+    "required": false
+  },
+  "fb_group_community_theme": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "motivation_day",
+      "tech_tip",
+      "open_qa",
+      "feedback_loop",
+      "member_spotlight",
+      "none"
+    ]
+  },
+  "fb_group_inside_angle": {
+    "type": "string",
+    "required": false
+  },
+  "fb_group_member_prompt": {
+    "type": "string",
+    "required": false
+  },
+  "fb_group_admin_action": {
+    "type": "string",
+    "required": false
+  },
+  "linkedin_scroll_stopper": {
+    "type": "string",
+    "required": false
+  },
+  "linkedin_presentation_format": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "text_only",
+      "document_slideshow",
+      "native_video",
+      "image_text",
+      "poll"
+    ]
+  },
+  "linkedin_proof_insight": {
+    "type": "string",
+    "required": false
+  },
+  "linkedin_primary_cta": {
+    "type": "string",
+    "required": false
+  },
+  "linkedin_first_comment": {
+    "type": "string",
+    "required": false
+  },
+  "linkedin_headline": {
+    "type": "string",
+    "required": false
+  },
+  "linkedin_document_uri": {
+    "type": "string",
+    "required": false
+  },
+  "x_hook": {
+    "type": "string",
+    "required": false
+  },
+  "x_post_format": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "single_post",
+      "thread",
+      "poll",
+      "video"
+    ]
+  },
+  "x_thread_blueprint": {
+    "type": "string",
+    "required": false
+  },
+  "x_follow_up_link": {
+    "type": "string",
+    "required": false
+  },
+  "x_thread_parts": {
+    "type": "array",
+    "required": false
+  },
+  "tiktok_three_second_hook": {
+    "type": "string",
+    "required": false
+  },
+  "tiktok_post_type": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "video",
+      "photo_carousel",
+      "stitch_duet"
+    ]
+  },
+  "tiktok_search_keywords": {
+    "type": "string",
+    "required": false
+  },
+  "tiktok_seo_caption": {
+    "type": "string",
+    "required": false
+  },
+  "instagram_aspect": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "reel",
+      "post",
+      "story"
+    ]
+  },
+  "ig_format": {
+    "type": "string",
+    "required": false,
+    "enum": [
+      "feed_post",
+      "reel",
+      "story",
+      "carousel"
+    ]
+  },
+  "ig_first_comment": {
+    "type": "string",
+    "required": false
+  },
+  "ig_location": {
+    "type": "string",
+    "required": false
+  },
+  "ig_audio_notes": {
+    "type": "string",
+    "required": false
+  },
+  "ig_cover_notes": {
+    "type": "string",
+    "required": false
+  },
+  "ig_story_link": {
+    "type": "string",
+    "required": false
+  },
+  "email_from_name": {
+    "type": "string",
+    "required": false
+  },
+  "email_subject": {
+    "type": "string",
+    "required": false
+  },
+  "email_preheader": {
+    "type": "string",
+    "required": false
+  },
+  "email_primary_cta": {
+    "type": "string",
+    "required": false
+  },
+  "community_target_space": {
+    "type": "string",
+    "required": false
+  },
+  "community_topics": {
+    "type": "string",
+    "required": false
+  },
+  "community_format": {
+    "type": "string",
+    "required": false
+  },
+  "substack_section": {
+    "type": "string",
+    "required": false
+  },
+  "substack_audience": {
+    "type": "string",
+    "required": false
+  },
+  "substack_email_subject": {
+    "type": "string",
+    "required": false
+  },
+  "post_sequence": {
+    "type": "number",
+    "required": false
+  },
+  "media": {
+    "type": "object",
+    "required": false,
+    "description": "Container for final output media asset (image/video/doc)"
+  }
+}

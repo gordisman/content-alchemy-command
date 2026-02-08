@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Alchemy Logo Preview</title>
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+        }
+        .container {
+            display: flex;
+            gap: 60px;
+            margin-top: 40px;
+        }
+        .concept-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 250px;
+        }
+        h2 { color: #00e5ff; font-size: 1.2rem; margin-bottom: 20px; }
+        p { font-size: 0.9rem; color: #94a3b8; line-height: 1.4; }
+        .logo-box {
+            padding: 40px;
+            background: #1e293b;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>CONTENT ALCHEMY: LEAF LOGO CONCEPTS</h1>
+    <div class="container">
+        <!-- Concept 1: The Organic Symmetrist -->
+        <div class="concept-card">
+            <div class="logo-box">
+                <svg width="120" height="120" viewBox="0 0 100 100" fill="none">
+                    <defs>
+                        <linearGradient id="g1" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#FF1CF7" />
+                            <stop offset="60%" stop-color="#7000FF" />
+                            <stop offset="100%" stop-color="#00E5FF" />
+                        </linearGradient>
+                        <filter id="glow1"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                    </defs>
+                    <path d="M50 90 C 45 85, 20 60, 20 40 C 20 20, 50 10, 50 10 C 50 10, 80 20, 80 40 C 80 60, 55 85, 50 90 Z" fill="url(#g1)" filter="url(#glow1)" fill-opacity="0.95"/>
+                    <path d="M50 90 L 50 10" stroke="white" stroke-width="2" stroke-opacity="0.8" stroke-linecap="round" filter="url(#glow1)"/>
+                    <circle cx="50" cy="30" r="1.5" fill="white" fill-opacity="0.8"/>
+                    <circle cx="40" cy="45" r="1" fill="white" fill-opacity="0.6"/>
+                    <circle cx="60" cy="55" r="1" fill="white" fill-opacity="0.6"/>
+                    <circle cx="50" cy="70" r="1.5" fill="white" fill-opacity="0.8"/>
+                </svg>
+            </div>
+            <h2>1. Organic Symmetrist</h2>
+            <p>Perfectly symmetrical leaf. Pure, simple, and biological.</p>
+        </div>
+
+        <!-- Concept 2: The Data-Vein Leaf -->
+        <div class="concept-card">
+            <div class="logo-box">
+                <svg width="120" height="120" viewBox="0 0 100 100" fill="none">
+                    <defs>
+                        <linearGradient id="g2" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#FF1CF7" />
+                            <stop offset="50%" stop-color="#7000FF" />
+                            <stop offset="100%" stop-color="#00E5FF" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M35 85 C 20 65, 30 30, 50 15 C 70 30, 80 65, 65 85 L 50 78 L 35 85 Z" fill="url(#g2)" fill-opacity="0.1" stroke="#00E5FF" stroke-width="4" stroke-linejoin="round"/>
+                    <path d="M50 15 L 50 78" stroke="#00E5FF" stroke-width="2"/>
+                    <path d="M35 60 L 50 50 M 65 60 L 50 50 M 40 40 L 50 35 M 60 40 L 50 35" stroke="#00E5FF" stroke-width="2" stroke-linecap="round"/>
+                    <rect x="48" y="48" width="4" height="4" fill="#00E5FF"/>
+                    <rect x="58" y="38" width="3" height="3" fill="#00E5FF"/>
+                    <rect x="39" y="58" width="3" height="3" fill="#00E5FF"/>
+                </svg>
+            </div>
+            <h2>2. Data-Vein Leaf</h2>
+            <p>Smooth geometric borders with internal 'circuit' patterns.</p>
+        </div>
+
+        <!-- Concept 3: Alchemical Crystal -->
+        <div class="concept-card">
+            <div class="logo-box">
+                <svg width="120" height="120" viewBox="0 0 100 100" fill="none">
+                    <path d="M50 15 L 75 45 L 65 85 L 35 85 L 25 45 Z" fill="#7000FF" fill-opacity="0.2" stroke="#FF1CF7" stroke-width="3"/>
+                    <path d="M50 15 L 50 85" stroke="#FF1CF7" stroke-width="1.5"/>
+                    <path d="M50 15 L 25 45 M 50 15 L 75 45 M 50 50 L 25 45 M 50 50 L 75 45" stroke="#00E5FF" stroke-width="2"/>
+                    <circle cx="50" cy="15" r="4" fill="#00E5FF" style="filter: blur(2px);"/>
+                    <circle cx="50" cy="15" r="2" fill="white"/>
+                </svg>
+            </div>
+            <h2>3. Alchemical Crystal</h2>
+            <p>A crystalized shard-leaf. Sharp, modern, and high-tech.</p>
+        </div>
+    </div>
+</body>
+</html>

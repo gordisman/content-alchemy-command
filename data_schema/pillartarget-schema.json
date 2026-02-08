@@ -1,0 +1,17 @@
+{
+  "allocation_set_id": {
+    "type": "string",
+    "required": true,
+    "description": "Link to parent AllocationSet"
+  },
+  "pillar_id": {
+    "type": "string",
+    "required": true,
+    "description": "Link to content pillar from Settings"
+  },
+  "target_percentage": {
+    "type": "number",
+    "required": true,
+    "description": "Target percentage for this pillar (0-100)"
+  }
+}

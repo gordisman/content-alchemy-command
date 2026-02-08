@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- HELPER FUNCTIONS ---
+    function isAdmin() {
+      return request.auth != null && 
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // --- RULES ---
+
+    // SETTINGS: LOCKED
+    // Only Admins can change global settings.
+    // Everyone can read (so the app works).
+    match /settings/{document=**} {
+      allow read: if true; 
+      allow write: if isAdmin();
+    }
+
+    // DEFAULT: OPEN
+    // All other collections (posts, ideas, etc.) are open to any user for now.
+    // This maintains the requested "Team Mode" behavior (everyone sees everything).
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

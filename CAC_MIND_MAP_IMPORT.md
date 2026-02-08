@@ -1,0 +1,77 @@
+# Content Alchemy Command Architecture
+
+- 1. System Architecture - The Big Picture
+    - A. The Factory (Your Code)
+        - What it is: The folder `i:\Antigravity...`
+        - What it contains: logic, designs, buttons, brain
+        - Quantity: ONE factory
+        - Reality: Changing blueprints for the future
+    - B. The Keys (The Environments)
+        - Key 1 - Dev Mode
+            - Command: `npm run env:dev`
+            - Opens: Development Database
+            - Safety: 100% Safe (Disposable Data)
+        - Key 2 - Prod Mode (Gord)
+            - Command: `npm run env:prod`
+            - Opens: Gord Prod Database
+            - Safety: LIVE DATA (Be Careful)
+    - C. The Destinations
+        - Localhost
+            - Your private looking glass
+        - Hosting (Web)
+            - A public looking glass
+            - URL: `https://cac-prod-gord.web.app`
+        - GitHub (The Vault)
+            - Secure off-site backup
+
+- 2. Standard Operating Procedures (SOP)
+    - Workflow A - The Builder Cycle (Dev)
+        - 1. Open Terminal
+        - 2. Insert Dev Key: `npm run env:dev`
+        - 3. Start Engine: `npm run dev`
+        - 4. Work: Edit Code & Test
+        - 5. Stop: `Ctrl + C`
+    - Workflow B - The Owner Cycle (Prod)
+        - 1. Open Terminal
+        - 2. Insert Prod Key: `npm run env:prod`
+        - 3. Start Engine: `npm run dev`
+        - 4. Work: Write Real Content
+        - 5. Stop: `Ctrl + C`
+    - Workflow C - The Promoter Cycle (Deploy)
+        - 1. Verify in Prod
+        - 2. Deploy: `npm run env:prod; npm run build; firebase deploy`
+        - 3. Result: `https://cac-prod-gord.web.app`
+    - Workflow D - The Savor Cycle (Backup)
+        - 1. Stage: `git add .`
+        - 2. Commit: `git commit -m "msg"`
+        - 3. Push: `git push`
+    - Workflow E - The Expander Cycle (New Client)
+        - 1. Firebase Console
+            - Create New Project
+            - Upgrade to Blaze Plan (Set Budget or Skip)
+            - Enable Auth, Firestore, Storage
+        - 2. Local Setup
+            - Create `.env.newclient`
+            - Add script to package.json
+        - 3. Configure Email Secrets (Critical)
+            - Step A: Get Password (Google App Passwords)
+            - Step B: Set Secret `firebase functions:secrets:set GMAIL_APP_PASSWORD`
+            - Step C: Deploy `firebase deploy --only functions`
+        - 4. Initialize
+            - `npm run env:newclient`
+            - `npm run dev`
+
+- 3. Command Reference Cheat Sheet
+    - Switch to Dev: `npm run env:dev`
+    - Switch to Prod: `npm run env:prod`
+    - Start Server: `npm run dev`
+    - Deploy: `firebase deploy`
+    - Git Save: `git commit -m "msg"`
+
+- 4. Troubleshooting
+    - "Global Settings Not Found"
+        - Fix: Click Initialize System button
+    - "Missing Permissions"
+        - Fix: Add email to `.env.prod`
+    - "Port 5173 already in use"
+        - Fix: Kill terminal or use Port 5174

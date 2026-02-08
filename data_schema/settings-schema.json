@@ -1,0 +1,189 @@
+{
+  "pillar_guide_url": {
+    "type": "string",
+    "required": false,
+    "description": "URL to external content pillar guide document"
+  },
+  "report_guide_url": {
+    "type": "string",
+    "required": false,
+    "description": "URL to external report interpretation guide"
+  },
+  "alert_notification_email": {
+    "type": "string",
+    "required": false,
+    "description": "Comma-separated email recipients for daily action alerts"
+  },
+  "alert_time": {
+    "type": "string",
+    "required": false,
+    "description": "Time for daily alert in HH:MM format (24-hour)"
+  },
+  "alert_timezone": {
+    "type": "string",
+    "required": false,
+    "description": "Timezone identifier for alert scheduling (e.g., America/Toronto)"
+  },
+  "last_alert_sent_at": {
+    "type": "string",
+    "required": false,
+    "description": "Date of last alert sent (YYYY-MM-DD format)"
+  },
+  "lane_visibility": {
+    "type": "object",
+    "required": false,
+    "description": "Toggle visibility for each platform lane",
+    "properties": {
+      "instagram": {
+        "type": "boolean",
+        "default": true
+      },
+      "youtube": {
+        "type": "boolean",
+        "default": true
+      },
+      "fb_page": {
+        "type": "boolean",
+        "default": true
+      },
+      "fb_group": {
+        "type": "boolean",
+        "default": true
+      },
+      "linkedin": {
+        "type": "boolean",
+        "default": true
+      },
+      "x": {
+        "type": "boolean",
+        "default": true
+      },
+      "tiktok": {
+        "type": "boolean",
+        "default": true
+      },
+      "substack": {
+        "type": "boolean",
+        "default": true
+      },
+      "community": {
+        "type": "boolean",
+        "default": true
+      }
+    }
+  },
+  "weekly_quotas": {
+    "type": "object",
+    "required": false,
+    "description": "Weekly post goals per platform",
+    "properties": {
+      "instagram": {
+        "type": "number",
+        "default": 5
+      },
+      "youtube": {
+        "type": "number",
+        "default": 2
+      },
+      "fb_page": {
+        "type": "number",
+        "default": 3
+      },
+      "fb_group": {
+        "type": "number",
+        "default": 3
+      },
+      "linkedin": {
+        "type": "number",
+        "default": 3
+      },
+      "x": {
+        "type": "number",
+        "default": 7
+      },
+      "tiktok": {
+        "type": "number",
+        "default": 5
+      },
+      "substack": {
+        "type": "number",
+        "default": 1
+      },
+      "community": {
+        "type": "number",
+        "default": 4
+      }
+    }
+  },
+  "youtube_playlists": {
+    "type": "array",
+    "required": false,
+    "items": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "yt_playlist_id": {
+        "type": "string",
+        "description": "Copy the code from your YouTube URL after 'list='. Example: PLabc123."
+      },
+      "yt_description": {
+        "type": "string",
+        "description": "A short SEO summary for this playlist."
+      },
+      "is_active": {
+        "type": "boolean",
+        "default": true,
+        "description": "Uncheck to hide this from the active selection list."
+      }
+    }
+  },
+  "content_pillars": {
+    "type": "array",
+    "required": false,
+    "description": "Strategic content pillars",
+    "items": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "color": {
+        "type": "string"
+      },
+      "disabled": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "direct_entry_post_counter": {
+    "type": "number",
+    "required": false,
+    "default": 0,
+    "description": "Global counter for direct entry posts (idea_id: 000)"
+  },
+  "storage_controls": {
+    "type": "object",
+    "required": false,
+    "description": "Configuration for automated storage management",
+    "properties": {
+      "retention_active": {
+        "type": "boolean",
+        "default": false,
+        "description": "Master switch for automated video purging"
+      },
+      "retention_days": {
+        "type": "number",
+        "default": 30,
+        "description": "Age in days before a video file is purged"
+      }
+    }
+  }
+}

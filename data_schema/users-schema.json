@@ -1,0 +1,29 @@
+{
+  "email": {
+    "type": "string",
+    "required": true,
+    "description": "User's email address (matches Firebase Auth)"
+  },
+  "name": {
+    "type": "string",
+    "required": false,
+    "description": "User's display name"
+  },
+  "role": {
+    "type": "string",
+    "required": true,
+    "default": "user",
+    "enum": ["admin", "user"],
+    "description": "User's role for access control"
+  },
+  "createdAt": {
+    "type": "timestamp",
+    "required": false,
+    "description": "Account creation timestamp"
+  },
+  "lastLogin": {
+    "type": "timestamp",
+    "required": false,
+    "description": "Last login timestamp"
+  }
+}

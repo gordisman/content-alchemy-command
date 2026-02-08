@@ -1,0 +1,80 @@
+{
+  "idea_number": {
+    "type": "number",
+    "required": true,
+    "description": "Sequential idea number starting from 101"
+  },
+  "master_title": {
+    "type": "string",
+    "required": true,
+    "description": "Internal reference title for the idea"
+  },
+  "concept": {
+    "type": "string",
+    "required": false,
+    "description": "Long-form narrative hook"
+  },
+  "pillar": {
+    "type": "string",
+    "required": false,
+    "description": "Content pillar assignment"
+  },
+  "universal_hashtags": {
+    "type": "string",
+    "required": false,
+    "description": "Global hashtag pool for this idea"
+  },
+  "is_favorite": {
+    "type": "boolean",
+    "required": false,
+    "default": false,
+    "description": "Greatest Hits toggle"
+  },
+  "last_posted_date": {
+    "type": "timestamp",
+    "required": false,
+    "description": "Last time this idea was used in a post"
+  },
+  "idea_audio_memo": {
+    "type": "string",
+    "required": false,
+    "description": "Audio memo file URL (supports .mp3, .wav, .m4a, max 50MB)"
+  },
+  "idea_audio_memo_duration": {
+    "type": "number",
+    "required": false,
+    "description": "Duration of the audio memo in seconds"
+  },
+  "resources": {
+    "type": "array",
+    "required": false,
+    "description": "Resource repeater for links and files",
+    "items": {
+      "type": {
+        "type": "string",
+        "required": false,
+        "enum": ["web_link", "gdrive", "local_file"]
+      },
+      "label": {
+        "type": "string",
+        "required": false
+      },
+      "uri": {
+        "type": "string",
+        "required": false
+      }
+    }
+  },
+  "status": {
+    "type": "string",
+    "required": false,
+    "default": "incubating",
+    "enum": ["incubating", "ready", "completed"]
+  },
+  "post_sequence_counter": {
+    "type": "number",
+    "required": false,
+    "default": 0,
+    "description": "High-water mark for post sequence numbers spawned from this idea"
+  }
+}
