@@ -140,4 +140,17 @@ Go to your terminal where `dev:all` is running and press:
 ### 3. Close & Sleep
 Now you can safely close VS Code and shut down your computer. Your code is safe on your disk and on GitHub!
 
+---
+
+## 📧 Troubleshooting Daily Alerts
+If you or a client receive a daily alert email but the **"VIEW IN STUDIO"** links are broken or point to the wrong place:
+
+1.  **Likely Cause:** The **Production App URL** in the settings is incorrect (perhaps it was initialized on a different domain or localhost).
+2.  **The Fix:** 
+    *   Go to the **Settings** page on the live site.
+    *   Scroll to **Action Alerts & Guidance**.
+    *   Update the **Production App URL** to match the current browser address.
+    *   Hit **Save Configuration**.
+3.  **Verification:** Send a **Test Alert (Preview)** to confirm the link now points to the correct "front door."
+
 

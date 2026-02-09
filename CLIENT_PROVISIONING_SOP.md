@@ -85,6 +85,14 @@ Before running any workflow, you must be in the **Root Directory** of your proje
 3.  **Navigate:** Go to **Studio** -> **Settings**.
 4.  **Initialize:** Because the database is empty, the app will automatically show a big **"Initialize System Defaults"** button. 
     *   **Action:** Click that button. The app will now "Seed" the database with all the standard Action Alert logic, pillar structures, and system defaults.
+    *   **Auto-Capture:** During this process, the system will automatically detect the current URL (e.g., `https://cac-prod-client-abc.web.app`) and save it as the **Production App URL**. This is required for the "View in Studio" links in the daily alert emails to work correctly.
+
+---
+
+## 🛠️ Post-Provisioning Verification
+1.  **Check Alerts:** Go to **Settings > Action Alerts & Guidance**.
+2.  **Verify URL:** Ensure the **Production App URL** matches the live hosting URL.
+3.  **Test Link:** Click **"Send Test Alert (Preview)"** and verify that the "VIEW IN STUDIO" link in the email opens the live app correctly.
 
 ---
 
