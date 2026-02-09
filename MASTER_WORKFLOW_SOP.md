@@ -120,4 +120,24 @@ You don't need to memorize these (you can always ask me to run them), but here i
 | **`firebase emulators:start`** | Starts the "Playground" database on your computer. |
 | **`firebase logout`** | Signs you out of the Firebase CLI. |
 
+---
+
+## 🌙 The "Goodnight" Shutdown Routine
+Before you turn off your PC for the night, follow these 3 steps to ensure a perfect start tomorrow:
+
+### 1. Final Cloud Sync
+If you've made changes today, push them to GitHub. This is your "Off-site Backup."
+*   **Command:** `git add .`, `git commit -m "daily wrap up"`, `git push origin main`
+
+### 2. Stop the Local Engine
+Go to your terminal where `dev:all` is running and press:
+*   **Keyboard:** `Ctrl + C`
+*   *(If asked "Terminate batch job?", type `y` and Enter).*
+*   **If it's stubborn:** Press `Ctrl + C` rapidly 3-4 times. 
+*   **The "Kill Switch":** If it still won't stop, click the **Trash Can icon** in the top-right of the terminal panel to force-close everything.
+*   **Why:** This closes the ports (5173, 8080, etc.) so they aren't "stuck" when you reboot tomorrow.
+
+### 3. Close & Sleep
+Now you can safely close VS Code and shut down your computer. Your code is safe on your disk and on GitHub!
+
 

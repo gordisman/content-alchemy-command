@@ -58,6 +58,7 @@ export const initializeSystemDefaults = async () => {
             },
             repurpose_cycle: 365,
             snooze_duration: 90,
+            app_url: window.location.origin,
             initializedAt: new Date()
         }, { merge: true });
         log.push('✅ Settings & Pillars Configured');

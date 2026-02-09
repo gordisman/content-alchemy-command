@@ -5,6 +5,21 @@ To deploy a fresh, empty version of **Content Alchemy Command** for a new client
 
 ---
 
+## 💼 Business Strategy & Ownership
+Before starting technically, decide on your ownership model:
+
+### 1. The "Landlord" Model (Recommended)
+*   **Who owns the Google Account?** You (Gord).
+*   **Workflow:** You create the child project in your own Firebase account. You pay the bills (and bill the client).
+*   **Client Involvement:** ZERO. You just give them a login to the final app.
+
+### 2. The "Sub-Contractor" Model
+*   **Who owns the Google Account?** The Client.
+*   **Workflow:** The client creates a Google Cloud project and adds your email as an **Owner/Editor**.
+*   **Client Involvement:** They must set up their own credit card for the "Blaze Plan."
+
+---
+
 ## 📋 Preparation Checklist (Firebase Console)
 Before you run any commands in Antigravity, you must set up the "Cloud Infrastructure" manually in your browser.
 1.  **Create a New Project:** Go to [console.firebase.google.com](https://console.firebase.google.com) and create `cac-prod-[clientname]`.

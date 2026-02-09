@@ -33,11 +33,12 @@
         - **Access URL:** `http://localhost:5173`
         - **Hardware:** Runs on your PC but requires Internet (Online)
     - **🔴 TIER 3: PROD (The Live Site)**
-        - **Code:** Static files deployed to the internet
-        - **GPS Keys:** Hardcoded to **`cac-prod-gord`**
+        - **Code:** **Automated via GitHub Actions**
+        - **GPS Keys:** Hardcoded in GitHub Secrets
         - **House/Data:** **REAL Database** in Google Cloud
         - **Access URL:** `https://cac-prod-gord.web.app`
-        - **Hardware:** Runs on Google's global server network
+        - **Hardware:** Google's Global Servers (Always On)
+        - **Pipeline:** Deployment triggered by `git push origin main`
 
 - **FRONTEND vs. BACKEND (The Split)**
     - **🖥️ FRONTEND (The Steering Wheel)**
@@ -58,3 +59,15 @@
 - **RESOURCES**
     - [MASTER_WORKFLOW_SOP.md](MASTER_WORKFLOW_SOP.md) (Step-by-step commands)
     - [CLIENT_PROVISIONING_SOP.md](CLIENT_PROVISIONING_SOP.md) (Setting up new clients)
+    - [BILLING_STAT_STRATEGY_GUIDE.md](BILLING_STAT_STRATEGY_GUIDE.md) (Pricing & Costs)
+
+---
+
+## 🛠️ The Tech Stack Summary
+For your mind maps and client conversations, here is the toolset we use:
+
+1.  **Frontend (React + Vite):** The modern "Engine" that makes the app fast and interactive.
+2.  **Infrastructure (Firebase):** Google's cloud platform. It handles your **Database** (Firestore), your **Logins** (Auth), and your **Files** (Storage).
+3.  **Styling (Tailwind CSS + Radix UI):** The "Premium Finish." These tools give us those high-end, modern layouts and buttons.
+4.  **Automation (GitHub Actions):** The "Robot" that deploys your code automatically when you save it.
+5.  **Language (JavaScript/Node.js):** The "Common Tongue" that all these tools speak.

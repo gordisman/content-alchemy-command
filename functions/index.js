@@ -30,7 +30,8 @@ async function runAlertLogic(source = "scheduled") {
         }
 
         // B. Check if it's time yet
-        // We compare the strings "HH:mm" directly for simplicity in the 1-hour window
+        // Since the scheduler runs at :05 past the hour (e.g., 08:05),
+        // any target time of :00 will now correctly pass this check.
         const nowTimeStr = now.toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone });
 
         if (nowTimeStr < configuredTime) {
@@ -154,7 +155,7 @@ async function runAlertLogic(source = "scheduled") {
 
         emailBody += `
         <div style="border: 1px solid #ddd; padding: 15px; margin: 15px 0; border-radius: 8px; background-color: #f9f9f9;">
-            <p style="margin: 5px 0;"><strong>🔢 ID:</strong> <code style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${postIdDisplay}</code></p>
+            <p style="margin: 5px 0;"><strong>🔢 ID:</strong> <code style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${postIdDisplay}</code> <a href="${settings.app_url || ''}/studio?focus=${post.id}" target="_blank" style="font-size: 11px; color: #8B5CF6; text-decoration: none; margin-left: 10px; font-weight: bold;">VIEW IN STUDIO &rarr;</a></p>
             <p style="margin: 5px 0;"><strong>📅 Schedule:</strong> ${timeStr}</p>
             <p style="margin: 5px 0;"><strong>📱 Platform:</strong> ${platform}</p>
             <p style="margin: 5px 0;"><strong>📝 Title:</strong> ${post.post_title || 'Untitled Post'}</p>
@@ -210,7 +211,7 @@ async function runAlertLogic(source = "scheduled") {
  * DAILY ACTION ALERT - SCHEDULED
  */
 exports.dailyActionAlert = onSchedule({
-    schedule: "every 1 hours",
+    schedule: "5 * * * *",
     timeZone: "America/Toronto",
     secrets: ["GMAIL_APP_PASSWORD"]
 }, async (event) => {

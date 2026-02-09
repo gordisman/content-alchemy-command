@@ -75,7 +75,8 @@ export default function Settings() {
         recipients: '',
         time: '09:00',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        guide_url: ''
+        guide_url: '',
+        app_url: ''
     });
 
     // Alert Preview State
@@ -108,7 +109,8 @@ export default function Settings() {
                 recipients: settings.alert_recipients || '',
                 time: settings.alert_time || '09:00',
                 timezone: settings.alert_timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-                guide_url: settings.report_guide_url || ''
+                guide_url: settings.report_guide_url || '',
+                app_url: settings.app_url || window.location.origin
             });
             setStorageConfig({
                 retention_active: settings.storage_controls?.retention_active || false,
@@ -307,7 +309,8 @@ export default function Settings() {
             alert_recipients: alertConfig.recipients,
             alert_time: alertConfig.time,
             alert_timezone: alertConfig.timezone,
-            report_guide_url: alertConfig.guide_url
+            report_guide_url: alertConfig.guide_url,
+            app_url: alertConfig.app_url
         });
         toast.success("Alert Config Saved");
     };
@@ -500,7 +503,7 @@ export default function Settings() {
 
                 emailBody += `
                 <div style="border: 1px solid #ddd; padding: 15px; margin: 15px 0; border-radius: 8px; background-color: #f9f9f9;">
-                    <p style="margin: 5px 0;"><strong>🔢 ID:</strong> <code style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${postIdDisplay}</code></p>
+                    <p style="margin: 5px 0;"><strong>🔢 ID:</strong> <code style="background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${postIdDisplay}</code> <a href="${alertConfig.app_url || ''}/studio?focus=${post.id}" target="_blank" style="font-size: 11px; color: #8B5CF6; text-decoration: none; margin-left: 10px; font-weight: bold;">VIEW IN STUDIO &rarr;</a></p>
                     <p style="margin: 5px 0;"><strong>📅 Schedule:</strong> ${time}</p>
                     <p style="margin: 5px 0;"><strong>📱 Platform:</strong> ${platform}</p>
                     <p style="margin: 5px 0;"><strong>📝 Title:</strong> ${post.post_title || 'Untitled Post'}</p>
@@ -1289,6 +1292,20 @@ export default function Settings() {
                                 disabled={!isAdmin}
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 disabled:opacity-50"
                                 placeholder="editor@example.com, manager@example.com"
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                                <Globe className="w-4 h-4 text-muted-foreground" />
+                                Production App URL (for email links)
+                            </label>
+                            <input
+                                type="url"
+                                value={alertConfig.app_url}
+                                onChange={(e) => isAdmin && setAlertConfig({ ...alertConfig, app_url: e.target.value })}
+                                disabled={!isAdmin}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 disabled:opacity-50"
+                                placeholder="https://content-alchemy.web.app"
                             />
                         </div>
                         <div className="grid gap-2">
