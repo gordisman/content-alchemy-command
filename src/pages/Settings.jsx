@@ -16,6 +16,7 @@ import { seedHighConfidenceData } from '../utils/high_confidence_seeder';
 import { Switch } from "@/components/ui/switch";
 import StrategyAllocationMatrix from '../components/settings/StrategyAllocationMatrix';
 import AlertPreviewModal from '../components/settings/AlertPreviewModal';
+import YouTubePlaylistManager from '../components/settings/YouTubePlaylistManager';
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -102,6 +103,8 @@ export default function Settings() {
         snooze_duration: 90
     });
 
+    const [youtubePlaylists, setYoutubePlaylists] = useState([]);
+
     // Load Settings into Alert Config
     useEffect(() => {
         if (settings) {
@@ -126,6 +129,7 @@ export default function Settings() {
                 repurpose_cycle: settings.repurpose_cycle || 365,
                 snooze_duration: settings.snooze_duration || 90
             });
+            setYoutubePlaylists(settings.youtube_playlists || []);
         }
     }, [settings]);
 
@@ -325,6 +329,18 @@ export default function Settings() {
         } catch (e) {
             console.error(e);
             toast.error("Failed to save settings");
+        }
+    };
+
+    const handleSavePlaylists = async (newList) => {
+        setYoutubePlaylists(newList);
+        try {
+            await updateDoc(doc(db, 'settings', 'global'), {
+                youtube_playlists: newList
+            });
+        } catch (e) {
+            console.error("Failed to save playlists:", e);
+            toast.error("Failed to save playlists to database");
         }
     };
 
@@ -1417,6 +1433,14 @@ export default function Settings() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* --- SECTION 5.5: YOUTUBE PLAYLISTS --- */}
+            <div className="bg-card rounded-lg border shadow-sm p-4">
+                <YouTubePlaylistManager
+                    playlists={youtubePlaylists}
+                    onSave={handleSavePlaylists}
+                />
             </div>
 
             {/* --- SECTION 6: INTEGRATIONS & AUTOMATION (PHASE II - HIDDEN) --- */}

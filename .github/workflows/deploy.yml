@@ -18,6 +18,9 @@ jobs:
           - project_id: cac-prod-gord
             secret_name: FIREBASE_SERVICE_ACCOUNT_CAC_PROD_GORD
             env_secret: ENV_CONFIG_CAC_PROD_GORD
+          - project_id: cac-prod-laurie
+            secret_name: FIREBASE_SERVICE_ACCOUNT_CAC_PROD_LAURIE
+            env_secret: ENV_CONFIG_CAC_PROD_LAURIE
 
     steps:
       - name: Checkout Repository

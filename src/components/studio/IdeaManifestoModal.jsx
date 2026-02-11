@@ -95,7 +95,7 @@ export default function IdeaManifestoModal({ idea, open, onClose, pillars = [] }
         toast.success("Copied to clipboard!");
     };
 
-    const downloadMarkdown = () => {
+    const handleCopyManifesto = () => {
         const content = `
 # ${idea.master_title}
 
@@ -108,15 +108,8 @@ ${idea.universal_hashtags || '#NoHashtags'}
 ## Resources
 ${(idea.resources || []).map(r => `- ${r.label}: ${r.uri}`).join('\n')}
         `;
-        const blob = new Blob([content], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `manifesto-${idea.id}.md`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        copyToClipboard(content);
+        toast.success("Manifesto copied to clipboard");
     };
 
     return (
@@ -125,11 +118,20 @@ ${(idea.resources || []).map(r => `- ${r.label}: ${r.uri}`).join('\n')}
 
                 {/* Header */}
                 <div className="flex flex-col p-6 pb-5 border-b border-border/40 shrink-0 gap-2.5">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold text-white tracking-tight">Idea Manifesto</h2>
-                        <Badge variant="outline" className="text-xs font-mono border-indigo-500/40 text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">
-                            #IDEA-{idea.idea_number || idea.id?.slice(-3) || '000'}
-                        </Badge>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-bold text-white tracking-tight">Idea Manifesto</h2>
+                            <Badge variant="outline" className="text-xs font-mono border-indigo-500/40 text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">
+                                #IDEA-{idea.idea_number || idea.id?.slice(-3) || '000'}
+                            </Badge>
+                        </div>
+                        <Button
+                            onClick={handleCopyManifesto}
+                            className="bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20 transition-all active:scale-95"
+                        >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copy Manifesto
+                        </Button>
                     </div>
 
                     {/* Pillar Badge (Now on its own line) */}
@@ -161,15 +163,6 @@ ${(idea.resources || []).map(r => `- ${r.label}: ${r.uri}`).join('\n')}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Narrative Hook</h3>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/30 gap-1.5"
-                                    onClick={() => copyToClipboard(idea.concept)}
-                                >
-                                    <Copy className="w-3 h-3" />
-                                    Copy Content
-                                </Button>
                             </div>
                             <div className="text-base text-slate-300 leading-relaxed whitespace-pre-wrap">
                                 {idea.concept || "No narrative hook defined."}
@@ -293,10 +286,6 @@ ${(idea.resources || []).map(r => `- ${r.label}: ${r.uri}`).join('\n')}
 
                 {/* Footer */}
                 <div className="p-6 border-t border-border/40 shrink-0 flex justify-end gap-3 bg-[#0F1117]">
-                    <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white gap-2" onClick={downloadMarkdown}>
-                        <Download className="w-4 h-4" />
-                        Download MD
-                    </Button>
                     <DialogClose asChild>
                         <Button className="bg-[#5d5dff] hover:bg-[#4b4bff] text-white min-w-[100px]">
                             Close

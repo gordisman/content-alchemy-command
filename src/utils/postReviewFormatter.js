@@ -17,25 +17,26 @@ const PLATFORM_LABELS = {
  * Generates a comprehensive text summary of a post, including all metadata,
  * platform fields, and resource references.
  */
-export const generateReviewText = ({ formData, idea, postId, postAudioURL, postAudioDuration }) => {
+export const generateReviewText = ({ formData, idea, postId, postAudioURL, postAudioDuration, resolvedPlaylists = [], settings }) => {
     let text = '';
     const platform = formData.platform;
     const formattedId = postId;
     const getField = (field) => formData.platform_fields?.[field] || 'N/A';
+    const SEPARATOR = '════════════════════';
 
     // POST HEADER
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `POST HEADER\n`;
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `Post ID: ${formattedId}\n`;
     text += `Platform: ${PLATFORM_LABELS[platform] || platform}\n`;
     text += `Content Pillar: ${formData.pillarName || 'N/A'}\n`;
     text += `\n`;
 
     // CONTENT
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `CONTENT\n`;
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `Post Title:\n${formData.post_title || 'N/A'}\n\n`;
     text += `Body:\n${formData.content_text || 'N/A'}\n\n`;
     text += `Call to Action:\n${formData.post_cta || 'N/A'}\n\n`;
@@ -43,12 +44,36 @@ export const generateReviewText = ({ formData, idea, postId, postAudioURL, postA
     text += `\n`;
 
     // PLATFORM SPECIFIC
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `PLATFORM SPECIFIC (${PLATFORM_LABELS[platform] || platform})\n`;
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
 
     if (platform === 'youtube') {
         text += `YouTube Type: ${getField('yt_type')}\n`;
+
+        // Add Playlists
+        let playlistsToDisplay = resolvedPlaylists;
+
+        // Backup Resolution Logic: If not passed explicitly, try to resolve using settings
+        if ((!playlistsToDisplay || playlistsToDisplay.length === 0) && settings?.youtube_playlists) {
+            const pFields = formData.platform_fields || {};
+            // Check both nested and flat locations for the IDs
+            const playlistIds = Array.isArray(pFields.youtube_playlists) ? pFields.youtube_playlists : (formData.youtube_playlists || []);
+
+            if (playlistIds.length > 0) {
+                playlistsToDisplay = settings.youtube_playlists.filter(p => playlistIds.includes(p.id));
+            }
+        }
+
+        if (playlistsToDisplay && playlistsToDisplay.length > 0) {
+            text += `Playlists:\n`;
+            playlistsToDisplay.forEach(pl => {
+                if (pl && pl.name) {
+                    text += `  - ${pl.name} (ID: ${pl.yt_playlist_id || 'N/A'})\n`;
+                }
+            });
+        }
+
         text += `SEO Title: ${getField('youtube_seo_title')}\n`;
         text += `SEO Description: ${getField('youtube_seo_description')}\n`;
         text += `SEO Tags: ${getField('youtube_seo_tags')}\n`;
@@ -108,9 +133,9 @@ export const generateReviewText = ({ formData, idea, postId, postAudioURL, postA
     text += `\n`;
 
     // RESOURCES
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `RESOURCES (IDEA & POST)\n`;
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
 
     const ideaResources = idea?.resources || [];
     const postResources = Array.isArray(formData.resources) ? formData.resources : (formData.resources?.links || []);
@@ -143,9 +168,9 @@ export const generateReviewText = ({ formData, idea, postId, postAudioURL, postA
     text += `\n`;
 
     // POST METADATA
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `POST METADATA\n`;
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `Media Type: ${(formData.media?.type || 'image').toUpperCase()}\n`;
     text += `Media Source: ${(formData.media?.source || 'external').toUpperCase()}\n`;
     text += `Media URL: ${formData.media?.url || 'N/A'}\n`;
@@ -153,9 +178,9 @@ export const generateReviewText = ({ formData, idea, postId, postAudioURL, postA
     text += `\n`;
 
     // SCHEDULE
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `SCHEDULE\n`;
-    text += `═══════════════════════════════════════════════\n`;
+    text += `${SEPARATOR}\n`;
     text += `Status: ${formData.status || 'N/A'}\n`;
     text += `Date & Time: ${formData.publish_date ? format(new Date(formData.publish_date), 'MMM d, yyyy') + ' at ' + (formData.publish_time || '00:00') : 'Not scheduled'}\n`;
 

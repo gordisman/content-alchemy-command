@@ -13,7 +13,13 @@ import {
     Filter,
     ArrowUpDown,
     Activity,
-    Shapes
+    Shapes,
+    Eye,
+    EyeOff,
+    CheckSquare,
+    Square,
+    ChevronRight,
+    Layers
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -21,6 +27,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     DropdownMenuCheckboxItem,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
@@ -34,6 +42,12 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import IdeaEditorModal from '../components/vault/IdeaEditorModal';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"; // Need tooltips
 
 export default function IdeaVault() {
     const { ideas, loading: ideasLoading, error: ideasError, updateIdea, deleteIdea, addIdea } = useIdeas();
@@ -44,14 +58,20 @@ export default function IdeaVault() {
     const [statusFilter, setStatusFilter] = useState('all'); // all, incubating, ready, completed
     const [pillarFilter, setPillarFilter] = useState('all');
 
+    // Feature: Sort & Hide Completed
+    const [sortOrder, setSortOrder] = useState('newest'); // newest, oldest, id_asc, id_desc, progress
+    const [hideCompleted, setHideCompleted] = useState(true);
+
+    // Feature: Select Mode
+    const [isSelectMode, setIsSelectMode] = useState(false);
+    const [selectedIdeas, setSelectedIdeas] = useState([]);
+
     // Editor State
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingIdea, setEditingIdea] = useState(null);
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [ideaToDelete, setIdeaToDelete] = useState(null);
-
-    // Sort logic could go here, defaulting to 'created desc' from hook for now.
 
     const loading = ideasLoading || settingsLoading;
 
@@ -72,7 +92,37 @@ export default function IdeaVault() {
         // Pillar
         const matchesPillar = pillarFilter === 'all' || idea.pillar === pillarFilter;
 
+        // Hide Completed (Feature)
+        // If hideCompleted is TRUE, and idea.status IS 'completed', then return FALSE (filter it out)
+        if (hideCompleted && idea.status === 'completed') {
+            return false;
+        }
+
         return matchesSearch && matchesStatus && matchesPillar;
+    });
+
+    // Sort Logic (Feature)
+    const sortedIdeas = [...filteredIdeas].sort((a, b) => {
+        switch (sortOrder) {
+            case 'newest':
+                return new Date(b.created_date || 0) - new Date(a.created_date || 0);
+            case 'oldest':
+                return new Date(a.created_date || 0) - new Date(b.created_date || 0);
+            case 'id_asc':
+                return (a.idea_number || 0) - (b.idea_number || 0);
+            case 'id_desc':
+                return (b.idea_number || 0) - (a.idea_number || 0);
+            case 'progress':
+                const getProgress = (idea) => {
+                    const ideaPosts = posts.filter(p => p.idea_id === idea.id);
+                    if (ideaPosts.length === 0) return 0;
+                    const published = ideaPosts.filter(p => p.status === 'published').length;
+                    return (published / ideaPosts.length);
+                };
+                return getProgress(b) - getProgress(a); // High to Low
+            default: // newest
+                return new Date(b.created_date || 0) - new Date(a.created_date || 0);
+        }
     });
 
     const pillars = settings?.content_pillars?.filter(p => p.active !== false) || [];
@@ -96,8 +146,53 @@ export default function IdeaVault() {
             });
             return;
         }
-        setIdeaToDelete(idea);
-        setDeleteDialogOpen(true);
+    };
+
+    // Selection Handlers
+    const toggleSelectMode = () => {
+        setIsSelectMode(!isSelectMode);
+        setSelectedIdeas([]); // Clear on toggle
+    };
+
+    const toggleIdeaSelection = (id) => {
+        setSelectedIdeas(prev =>
+            prev.includes(id)
+                ? prev.filter(i => i !== id)
+                : [...prev, id]
+        );
+    };
+
+    const handleSelectAllVisible = () => {
+        if (selectedIdeas.length === sortedIdeas.length) {
+            setSelectedIdeas([]); // Clear if all selected
+        } else {
+            setSelectedIdeas(sortedIdeas.map(i => i.id));
+        }
+    };
+
+    const handleBulkStatusUpdate = async (newStatus) => {
+        try {
+            const promises = selectedIdeas.map(id => updateIdea(id, { status: newStatus }));
+            await Promise.all(promises);
+            toast.success(`${selectedIdeas.length} ideas moved to ${newStatus}`);
+            setSelectedIdeas([]);
+            setIsSelectMode(false);
+        } catch (error) {
+            toast.error("Failed to update status");
+        }
+    };
+
+    const handleBulkPillarUpdate = async (pillarId) => {
+        try {
+            const promises = selectedIdeas.map(id => updateIdea(id, { pillar: pillarId }));
+            await Promise.all(promises);
+            const pillarName = pillars.find(p => p.id === pillarId)?.name || 'Unknown';
+            toast.success(`${selectedIdeas.length} ideas assigned to "${pillarName}"`);
+            setSelectedIdeas([]);
+            setIsSelectMode(false);
+        } catch (error) {
+            toast.error("Failed to update pillar");
+        }
     };
 
     const confirmDelete = async () => {
@@ -116,6 +211,17 @@ export default function IdeaVault() {
         setDeleteDialogOpen(false);
     };
 
+    const getSortLabel = (key) => {
+        switch (key) {
+            case 'newest': return 'Date Created (Newest)';
+            case 'oldest': return 'Date Created (Oldest)';
+            case 'id_asc': return 'ID Number (Low to High)';
+            case 'id_desc': return 'ID Number (High to Low)';
+            case 'progress': return 'Progress (% Published)';
+            default: return 'Sort By';
+        }
+    };
+
     return (
         <div className="h-full flex flex-col p-2 md:p-6 space-y-3 md:space-y-6 overflow-hidden">
             {/* Header */}
@@ -130,20 +236,20 @@ export default function IdeaVault() {
             </div>
 
             {/* Toolbar - Consolidated Row */}
-            <div className="glass-panel p-2 md:p-4 rounded-xl flex items-center gap-2 shrink-0">
-                {/* Search - Flexible */}
-                <div className="relative flex-1 min-w-0">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9 h-10 bg-background/50 border-border w-full text-sm"
-                    />
-                </div>
+            <div className="glass-panel p-2 md:p-4 rounded-xl flex flex-col gap-3 shrink-0">
+                {/* Top Row: Search + Main Filters + New Idea */}
+                <div className="flex flex-wrap items-center gap-2 w-full">
+                    {/* Search - Flexible */}
+                    <div className="relative flex-1 min-w-[200px]">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-9 h-10 bg-background/50 border-border w-full text-sm"
+                        />
+                    </div>
 
-                {/* Filters Group */}
-                <div className="flex items-center gap-2">
                     {/* Status Filter */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -182,9 +288,9 @@ export default function IdeaVault() {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* New Idea Button - Moved Here */}
+                    {/* New Idea Button - Always on Right */}
                     <Button
-                        className="bg-primary hover:bg-primary/90 text-white h-10 w-10 md:w-auto md:px-4"
+                        className="bg-primary hover:bg-primary/90 text-white h-10 w-10 md:w-auto md:px-4 ml-auto"
                         size="icon md:default"
                         title="Create New Idea"
                         onClick={() => {
@@ -196,18 +302,139 @@ export default function IdeaVault() {
                         <span className="hidden md:inline">New Idea</span>
                     </Button>
                 </div>
+
+                {/* Bottom Row: Sort + View Options */}
+                <div className="flex flex-wrap items-center gap-2 w-full border-t border-border/30 pt-2">
+                    {/* Sort Dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="h-9 px-3 min-w-[180px] justify-between text-muted-foreground hover:text-foreground text-xs">
+                                <span className="flex items-center gap-2 truncate">
+                                    <ArrowUpDown className="w-3.5 h-3.5" />
+                                    {getSortLabel(sortOrder)}
+                                </span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-[200px]">
+                            <DropdownMenuRadioGroup value={sortOrder} onValueChange={setSortOrder}>
+                                <DropdownMenuRadioItem value="newest">Date Created (Newest)</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="oldest">Date Created (Oldest)</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="id_asc">ID Number (Low to High)</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="id_desc">ID Number (High to Low)</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="progress">Progress (% Published)</DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Show/Hide Completed */}
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant={hideCompleted ? "default" : "secondary"}
+                                    className={`h-9 px-3 gap-2 transition-all text-xs ${hideCompleted ? "bg-[#5d5dff] hover:bg-[#4b4bff] text-white" : ""}`}
+                                    onClick={() => setHideCompleted(!hideCompleted)}
+                                    title={hideCompleted ? "Show Completed" : "Hide Completed"}
+                                >
+                                    {hideCompleted ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                    {hideCompleted ? "Show Completed" : "Hide Completed"}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p className="max-w-xs">{hideCompleted ? "ON: Hides completed/archived ideas to keep your active workspace clean." : "OFF: Shows all ideas including completed/archived ones."}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    {/* Select Mode Toggle & Toolbar - Starts on new line on mobile */}
+                    <div className="w-full md:w-auto flex items-center gap-2 mt-2 md:mt-0 md:border-l md:border-border/30 md:pl-2">
+                        {!isSelectMode ? (
+                            <Button
+                                variant="outline"
+                                className="h-9 px-3 gap-2 transition-all text-xs border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                                onClick={toggleSelectMode}
+                            >
+                                <CheckSquare className="w-3.5 h-3.5" />
+                                Select Mode
+                            </Button>
+                        ) : (
+                            <div className="flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                                <Button
+                                    variant="default"
+                                    className="h-9 px-3 gap-2 text-xs bg-violet-600 hover:bg-violet-700 text-white font-semibold"
+                                    onClick={handleSelectAllVisible}
+                                >
+                                    <CheckSquare className="w-3.5 h-3.5" />
+                                    Selected ({selectedIdeas.length})
+                                </Button>
+
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="h-9 text-xs"
+                                    onClick={handleSelectAllVisible}
+                                >
+                                    {selectedIdeas.length === sortedIdeas.length ? "Deselect All" : "Select All Visible"}
+                                </Button>
+
+                                {selectedIdeas.length > 0 && (
+                                    <>
+                                        <div className="h-4 w-px bg-border mx-1" />
+
+                                        <Button variant="outline" size="sm" className="h-9 text-xs gap-1" onClick={() => handleBulkStatusUpdate('ready')}>
+                                            <ChevronRight className="w-3 h-3" /> Move to Ready
+                                        </Button>
+
+                                        <Button variant="outline" size="sm" className="h-9 text-xs gap-1" onClick={() => handleBulkStatusUpdate('incubating')}>
+                                            <ChevronRight className="w-3 h-3 rotate-180" /> Return to Incubating
+                                        </Button>
+
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline" size="sm" className="h-9 text-xs gap-1">
+                                                    <Layers className="w-3 h-3" /> Assign Pillar
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuItem onClick={() => handleBulkPillarUpdate(null)}>
+                                                    Unassigned
+                                                </DropdownMenuItem>
+                                                {pillars.map(p => (
+                                                    <DropdownMenuItem key={p.id} onClick={() => handleBulkPillarUpdate(p.id)} className="gap-2">
+                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                                                        {p.name}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </>
+                                )}
+
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                                    onClick={toggleSelectMode}
+                                    title="Exit Select Mode"
+                                >
+                                    <EyeOff className="w-3.5 h-3.5" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Grid */}
             <div className="flex-1 overflow-y-auto pr-1 md:pr-2 min-h-0">
-                {filteredIdeas.length === 0 ? (
+                {sortedIdeas.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
                         <Lightbulb className="w-12 h-12 mb-4 opacity-20" />
                         <p>No ideas found matching your filters.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredIdeas.map(idea => (
+                        {sortedIdeas.map(idea => (
                             <IdeaCard
                                 key={idea.id}
                                 idea={idea}
@@ -219,6 +446,15 @@ export default function IdeaVault() {
                                     setEditingIdea(i);
                                     setEditorOpen(true);
                                 }}
+                                // New Props for Post Counting
+                                postCounts={{
+                                    total: posts.filter(p => p.idea_id === idea.id).length,
+                                    published: posts.filter(p => p.idea_id === idea.id && p.status === 'published').length
+                                }}
+                                // New Props for Selection
+                                isSelectMode={isSelectMode}
+                                isSelected={selectedIdeas.includes(idea.id)}
+                                onToggleSelect={toggleIdeaSelection}
                             />
                         ))}
                     </div>

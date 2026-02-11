@@ -13,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { format, addDays } from "date-fns";
 import { toast } from "sonner";
-import { Copy, Download, CalendarIcon, Loader2, Save, Trash2, Clock, Link as LinkIcon, Image as ImageIcon, ExternalLink, FileText, Plus, Play, Pause, Mic, Sparkles, Eye, StopCircle, Upload, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, ArrowUpRight, Globe, Cloud, Database, Box, HardDrive, Laptop, Repeat } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Copy, Download, CalendarIcon, Loader2, Save, Trash2, Clock, Link as LinkIcon, Image as ImageIcon, ExternalLink, FileText, Plus, Play, Pause, Mic, Sparkles, Eye, StopCircle, Upload, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Check, ArrowUpRight, Globe, Cloud, Database, Box, HardDrive, Laptop, Repeat } from "lucide-react";
 import { generateReviewText } from '../../utils/postReviewFormatter';
 import {
     AlertDialog,
@@ -30,6 +31,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { SORTED_PLATFORMS } from '../../config/platforms';
 import { formatPostId } from '../../utils/postIdFormatter';
 import PostReviewOverlay from './PostReviewOverlay';
+import YouTubePlaylistSelector from './YouTubePlaylistSelector';
 
 export default function PostEditorModal({ open, onClose, post, idea, ideas = [], allPosts = [], onSave, onDelete, initialPlatform, onUpdateIdea, pillars = [], settings = {}, onViewManifesto }) {
     const [formData, setFormData] = useState({
@@ -684,12 +686,23 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
             const selectedPillar = pillars.find(p => p.id === (formData.definitive_pillar || formData.pillar));
 
             // 1. Copy Comprehensive Text (Uses established displayedPostId for accuracy)
+            // Resolve Playlists (if YouTube) - explicitly calculated here for safety
+            const playlistIds = Array.isArray(formData.platform_fields?.youtube_playlists)
+                ? formData.platform_fields.youtube_playlists
+                : (formData.youtube_playlists || []); // Fallback
+
+            const allPlaylists = settings?.youtube_playlists || [];
+            const resolvedPlaylists = allPlaylists.filter(p => playlistIds.includes(p.id));
+
+            // 1. Copy Comprehensive Text (Uses established displayedPostId for accuracy)
             const reviewText = generateReviewText({
                 formData: { ...formData, pillarName: selectedPillar?.name },
                 idea: currentIdea,
                 postId: displayedPostId,
                 postAudioURL: audioURL,
-                postAudioDuration: postPlayerDuration || recordingDuration || post?.post_audio_memo_duration || 0
+                postAudioDuration: postPlayerDuration || recordingDuration || post?.post_audio_memo_duration || 0,
+                resolvedPlaylists,
+                settings
             });
 
             // 1. Copy Comprehensive Text
@@ -1512,7 +1525,12 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-xs">Playlists</Label>
-                                                <Input placeholder="Comma separated..." value={getField('youtube_playlists')} disabled={formData.is_locked} onChange={(e) => updateField('youtube_playlists', e.target.value)} />
+                                                <YouTubePlaylistSelector
+                                                    value={getField('youtube_playlists')}
+                                                    onChange={(val) => updateField('youtube_playlists', val)}
+                                                    playlists={settings.youtube_playlists || []}
+                                                    disabled={formData.is_locked}
+                                                />
                                             </div>
                                         </div>
                                         <div className="space-y-1">
@@ -1521,7 +1539,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">SEO Description</Label>
-                                            <Textarea className="h-20" placeholder="YouTube description..." value={getField('youtube_seo_description')} disabled={formData.is_locked} onChange={(e) => updateField('youtube_seo_description', e.target.value)} />
+                                            <Textarea className="h-80" placeholder="YouTube description..." value={getField('youtube_seo_description')} disabled={formData.is_locked} onChange={(e) => updateField('youtube_seo_description', e.target.value)} />
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Tags</Label>

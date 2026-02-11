@@ -61,5 +61,38 @@ Ask these questions to determine which model to use:
 
 ---
 
+## 🏢 Responsibility & Maintenance Matrix
+
+If a client chooses to "Own their House" (Option B), duties must be clearly defined.
+
+| Task | Landlord (Option A) | Sub-Contractor (Option B) |
+| :--- | :--- | :--- |
+| **Server Billing** | Gord pays Google; bills client. | Client pays Google directly. |
+| **Initial Project Setup** | Gord (Instant). | Client (Manual/Guided). |
+| **Code Updates** | Gord (Automatic/Fleet-wide). | Gord (Requires project access). |
+| **Troubleshooting** | Gord (24/7 access). | Gord (Acting as Client IT). |
+| **Data Backups** | Managed by Gord. | Managed by Gord (using Client tools). |
+
+### 🛠️ Acting as "External IT"
+If the client provides you with their Google login (or adds your email as an **Owner** in Firebase), you can perform 100% of the technical work for them. They "Own" the asset, but you "Manage" the asset. This is the best of both worlds for high-security clients who don't want to get their hands dirty.
+
+---
+
+## 💎 Pricing Tier Logic
+
+Your pricing should reflect the different levels of responsibility and friction:
+
+### Tier 1: The Managed Service (Landlord)
+*   **Target:** Solopreneurs & Small Teams.
+*   **Pricing:** High Monthly/Annual Fee.
+*   **Rationale:** "You pay me for the result. I handle all the plumbing, the hosting, and the maintenance. You just log in and create."
+
+### Tier 2: The Managed Asset (Sub-Contractor)
+*   **Target:** Agencies or Enterprise Clients.
+*   **Pricing:** Lower Monthly Management Fee + Higher One-time Setup Fee.
+*   **Rationale:** "You own the database and pay Google the raw costs ($0.05 - $5/mo). You pay me a management fee to be your 'Content Architect' and keep the system running. Since I have to work within *your* specific infrastructure, there is a higher one-time activation cost."
+
+---
+
 ## 🛡️ Data Ownership Addendum
 If a client uses **Option A** but later wants to "leave," you can promise them a **"Data Export"** (a JSON file of all their posts). This usually satisfies most small business owners' fears about data lock-in.

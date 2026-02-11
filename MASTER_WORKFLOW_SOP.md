@@ -142,6 +142,30 @@ Now you can safely close VS Code and shut down your computer. Your code is safe 
 
 ---
 
+### 🚢 Fleet Management: Deploying to Multiple Clients
+
+Once you have multiple clients (like **Laurie**), you have two strategies for updates.
+
+#### Strategy A: The "Fleet Release" (Automatic) - CURRENT SETUP
+In this mode, pushing to GitHub updates EVERYONE at once. 
+*   **Pros:** Very fast, zero extra work.
+*   **Cons:** If there's a bug, it hits everyone at the same time.
+*   **Commands:** `git push` (Updates Gord & Laurie simultaneously).
+
+#### Strategy B: The "Staged Release" (Manual Promotion) - RECOMMENDED
+This is what we will use to give you the control you asked for. You update yourself first, then "promote" to the client.
+1.  **Update Gord:** Push your code. Only Gord's site updates.
+2.  **Test:** verify everything is perfect on your live site.
+3.  **Promote to Laurie:** Either manually trigger the Laurie deployment or "enable" her in the code list.
+
+#### 🛠️ Client-Specific Local Commands
+I have added these shortcuts to your project so you can "inhabit" Laurie's world locally:
+*   `npm run env:laurie`: Swaps your local keys to point to Laurie's production database.
+*   `npm run env:gord`: Swaps back to your production database.
+*   `npm run env:dev`: Swaps back to the local fake/test database.
+
+---
+
 ## 📧 Troubleshooting Daily Alerts
 If you or a client receive a daily alert email but the **"VIEW IN STUDIO"** links are broken or point to the wrong place:
 

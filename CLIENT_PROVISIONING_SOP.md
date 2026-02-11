@@ -24,8 +24,15 @@ Before starting technically, decide on your ownership model:
 Before you run any commands in Antigravity, you must set up the "Cloud Infrastructure" manually in your browser.
 1.  **Create a New Project:** Go to [console.firebase.google.com](https://console.firebase.google.com) and create `cac-prod-[clientname]`.
 2.  **Enable Paid Billing (Blaze):** Cloud Functions require the Blaze plan (there is a free tier, but a card must be on file).
-3.  **Authentication:** Enable **Email/Password** in the "Build > Authentication" tab.
-4.  **Database:** Create the **Firestore Database** (choose a location close to the client's home base).
+### 3. Configure Authentication
+*   Go to **Authentication** > **Sign-in method**.
+*   Click **Add new provider**.
+*   **Email/Password:** Enable this (Primary for clients with professional emails).
+*   **Google:** Enable this (Primary for Admin/Gord and clients with Gmail).
+    *   *Note: Set the "Public-facing name" to "Content Alchemy Command".*
+4.  **Database:** Create the **Firestore Database** in Production Mode.
+5.  **Storage:** Go to Build > Storage, click **Get Started**, choose **Production Mode**, and click Done. (Rules will fail if you skip this!)
+6.  **Web App:** Register a new Web App (Name: `[Name] Prod Web`) and save the config.
 
 ---
 
@@ -72,20 +79,28 @@ Before running any workflow, you must be in the **Root Directory** of your proje
     ```powershell
     npm run build
     ```
-3.  **Command - Deploy:** (This pushes the code to the live URL)
-    ```powershell
-    firebase deploy
-    ```
-
+## 🚀 Phase 3: The First Launch
+- [ ] **Build:** `npm run build`
+- [ ] **Deploy All:** `firebase deploy` (This handles Code, Rules, and Robots in one go)
+- [ ] **Login:** Gord logs in via Google URL
 ### Step 4: Initialize the Client Database
 **Goal:** Your new project is currently an "empty house." You need to move the furniture in (System Defaults and Pillars).
 
 1.  **Open:** Go to the **Hosting URL** provided at the end of the `firebase deploy` command.
-2.  **Log In:** Use an email address you listed in the `VITE_ADMIN_EMAILS` section of their `.env` file.
-3.  **Navigate:** Go to **Studio** -> **Settings**.
-4.  **Initialize:** Because the database is empty, the app will automatically show a big **"Initialize System Defaults"** button. 
-    *   **Action:** Click that button. The app will now "Seed" the database with all the standard Action Alert logic, pillar structures, and system defaults.
-    *   **Auto-Capture:** During this process, the system will automatically detect the current URL (e.g., `https://cac-prod-client-abc.web.app`) and save it as the **Production App URL**. This is required for the "View in Studio" links in the daily alert emails to work correctly.
+2.  **Log In:** Use your Google Admin account (`gord.isman@gmail.com`).
+3.  **Initialize:** Click the **"Initialize System Defaults"** button.
+
+### Step 5: Interior Decorating (In-App Setup)
+**Goal:** Tailor the experience and verify the communication robot works.
+
+1.  **Navigate:** Go to **Studio** -> **Settings**.
+2.  **Recipients:** In the "Action Alerts" section, add the client's email.
+3.  **Verify URL:** Ensure the "Production App URL" matches the live site URL (this ensures links in emails work!).
+4.  **Timezone:** Set the client's local timezone.
+5.  **THE TEST:** Click **"Send Test Alert (Preview)"**. 
+    *   *Verify that you (and the client) receive the email.*
+    *   *If this fails, verify the `GMAIL_APP_PASSWORD` secret was set correctly.*
+6.  **Hand-off:** Send the `[NAME]_ONBOARDING.md` guide to the client.
 
 ---
 
@@ -93,6 +108,20 @@ Before running any workflow, you must be in the **Root Directory** of your proje
 1.  **Check Alerts:** Go to **Settings > Action Alerts & Guidance**.
 2.  **Verify URL:** Ensure the **Production App URL** matches the live hosting URL.
 3.  **Test Link:** Click **"Send Test Alert (Preview)"** and verify that the "VIEW IN STUDIO" link in the email opens the live app correctly.
+
+---
+
+## 🚀 How to Log In
+Depending on your email type, choose the best method:
+
+### Option A: Professional Email (Recommended)
+1.  **Sign Up:** Click the **"Sign Up"** link at the bottom of the login box.
+2.  **Credentials:** Use your professional email (`laurie@alexanderart.com`) and create a secure password.
+3.  **Verification:** Check your inbox for a verification email and click the link to activate your account.
+
+### Option B: Gmail Account
+1.  **One-Click:** Simply click the **"Sign in with Google"** button.
+2.  **Authorize:** Select your Google account and you will be logged in instantly.
 
 ---
 

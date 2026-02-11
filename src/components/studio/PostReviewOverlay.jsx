@@ -19,13 +19,28 @@ export default function PostReviewOverlay({ open, onClose, formData, idea, setti
         return val;
     };
 
+    // Resolve Playlists (if YouTube)
+    const playlistIds = Array.isArray(formData.platform_fields?.youtube_playlists)
+        ? formData.platform_fields.youtube_playlists
+        : (formData.youtube_playlists || []); // Fallback if flat
+
+    // Note: formData often has flat fields merged, but let's be safe.
+    // In PostEditorModal, fields are often flattened into formData for the form, but in review we might see raw schema.
+    // Based on PostEditorModal: `updateField` updates `formData[field]`.
+    // So `formData.youtube_playlists` should be the array of IDs.
+
+    const allPlaylists = settings?.youtube_playlists || [];
+    const resolvedPlaylists = allPlaylists.filter(p => playlistIds.includes(p.id));
+
     const handleCopyAll = () => {
         const reviewText = generateReviewText({
             formData: { ...formData, pillarName: selectedPillar?.name },
             idea,
             postId,
             postAudioURL,
-            postAudioDuration
+            postAudioDuration,
+            resolvedPlaylists,
+            settings
         });
         navigator.clipboard.writeText(reviewText);
         toast.success('Full post assembly copied to clipboard!');
@@ -178,6 +193,20 @@ export default function PostReviewOverlay({ open, onClose, formData, idea, setti
                                 {platform === 'youtube' && (
                                     <>
                                         <div className="text-sm"><span className="text-slate-400 block text-xs mb-1">YouTube Type:</span> {getField('yt_type')}</div>
+                                        <div className="text-sm col-span-2">
+                                            <span className="text-slate-400 block text-xs mb-1">Playlists:</span>
+                                            {resolvedPlaylists.length > 0 ? (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {resolvedPlaylists.map(pl => (
+                                                        <Badge key={pl.id} variant="secondary" className="bg-white/10 text-white border-white/20 font-normal">
+                                                            {pl.name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="italic text-slate-500">None</span>
+                                            )}
+                                        </div>
                                         <div className="text-sm"><span className="text-slate-400 block text-xs mb-1">SEO Title:</span> {getField('youtube_seo_title')}</div>
                                         <div className="text-sm col-span-2"><span className="text-slate-400 block text-xs mb-1">SEO Description:</span> <p className="text-slate-200 whitespace-pre-wrap">{getField('youtube_seo_description')}</p></div>
                                         <div className="text-sm"><span className="text-slate-400 block text-xs mb-1">SEO Tags:</span> {getField('youtube_seo_tags')}</div>

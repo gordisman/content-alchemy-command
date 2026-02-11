@@ -30,15 +30,46 @@ export default function IdeaCard({
     onDelete,
     onToggleFavorite,
     onArchive,
-    pillar
+    pillar,
+    postCounts, // { total, published }
+    isSelectMode,
+    isSelected,
+    onToggleSelect
 }) {
     const status = statusConfig[idea.status] || statusConfig.incubating;
 
     return (
-        <Card className={cn(
-            "glass-panel rounded-xl p-5 transition-all duration-300 hover:shadow-[0_0_30px_rgba(139,92,246,0.15)] hover:border-violet-500/50 relative group",
-            idea.is_favorite && "ring-1 ring-amber-500/30"
-        )}>
+        <Card
+            className={cn(
+                "glass-panel rounded-xl p-5 transition-all duration-300 hover:shadow-[0_0_30px_rgba(139,92,246,0.15)] hover:border-violet-500/50 relative group",
+                idea.is_favorite && "ring-1 ring-amber-500/30",
+                isSelected && "border-primary ring-1 ring-primary bg-primary/5"
+            )}
+            onClick={(e) => {
+                if (isSelectMode) {
+                    e.preventDefault();
+                    onToggleSelect(idea.id);
+                }
+            }}
+        >
+            {/* Selection Checkbox */}
+            {(isSelectMode || isSelected) && (
+                <div className="absolute top-4 left-4 z-50">
+                    <div
+                        className={cn(
+                            "h-5 w-5 rounded border border-slate-600 bg-slate-900/80 flex items-center justify-center transition-all cursor-pointer",
+                            isSelected && "bg-primary border-primary"
+                        )}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleSelect(idea.id);
+                        }}
+                    >
+                        {isSelected && <div className="h-2.5 w-2.5 bg-white rounded-sm" />}
+                    </div>
+                </div>
+            )}
+
             {pillar && (
                 <div
                     className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
@@ -46,7 +77,8 @@ export default function IdeaCard({
                 />
             )}
 
-            <div className="flex items-center justify-between gap-3 mb-3 pl-2">
+            <div className="flex items-center justify-between gap-3 mb-2 pl-6">
+                {/* Added padding-left to account for checkbox area if needed, though visible mainly in mode */}
                 <Badge className={cn("text-xs border-0 shrink-0", status.color)}>
                     {status.label}
                 </Badge>
@@ -96,6 +128,15 @@ export default function IdeaCard({
                     </div>
                 </div>
             </div>
+
+            {/* Posts Count Badge - New Row */}
+            {postCounts?.total > 0 && (
+                <div className="mb-3 pl-2">
+                    <Badge variant="outline" className="text-xs bg-violet-500/10 text-violet-300 border-violet-500/20 shrink-0">
+                        Posts: {postCounts.published}/{postCounts.total} Published
+                    </Badge>
+                </div>
+            )}
 
             <div className="pl-2">
                 <h3 className="font-semibold text-lg mb-2 line-clamp-2 leading-tight">
