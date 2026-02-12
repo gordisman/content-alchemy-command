@@ -32,6 +32,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { storage } from '../lib/firebase';
+import { ref, deleteObject } from 'firebase/storage';
 
 // Error Boundary for Debugging
 class ErrorBoundary extends React.Component {
@@ -460,16 +462,37 @@ export default function Studio() {
     // Triggered by Dialog Confirmation
     const confirmDeletePost = async () => {
         if (deleteDetails?.post) {
-            const pid = formatPostId(deleteDetails.post, ideas.find(i => i.id === deleteDetails.post.idea_id));
+            const post = deleteDetails.post;
+            const pid = formatPostId(post, ideas.find(i => i.id === post.idea_id));
+
             try {
-                await deletePost(deleteDetails.post.id);
+                // 1. Cleanup Storage Assets BEFORE deleting the database record
+                const assetsToNuke = [
+                    post.media?.url,
+                    post.media?.thumbnail_url,
+                    post.media?.caption_url,
+                    post.post_audio_memo
+                ].filter(url => url && url.includes('firebasestorage.googleapis.com'));
+
+                for (const url of assetsToNuke) {
+                    try {
+                        const storageRef = ref(storage, url);
+                        await deleteObject(storageRef);
+                        console.log("Cleaned up orphaned storage asset:", url);
+                    } catch (e) {
+                        console.warn("Storage asset cleanup skipped (likely already gone):", url);
+                    }
+                }
+
+                // 2. Delete the database record
+                await deletePost(post.id);
                 setEditorOpen(false); // Close editor if open
                 toast.success(`Post ${pid} deleted`, {
-                    description: "The post has been permanently removed from the vault."
+                    description: "The post and all associated storage assets have been permanently removed."
                 });
             } catch (error) {
                 console.error("Failed to delete post:", error);
-                toast.error("Failed to delete post", {
+                toast.error("Deletion failed", {
                     description: error.message || "An unexpected error occurred."
                 });
             } finally {

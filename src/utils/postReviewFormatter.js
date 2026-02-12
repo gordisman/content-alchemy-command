@@ -173,8 +173,34 @@ export const generateReviewText = ({ formData, idea, postId, postAudioURL, postA
     text += `${SEPARATOR}\n`;
     text += `Media Type: ${(formData.media?.type || 'image').toUpperCase()}\n`;
     text += `Media Source: ${(formData.media?.source || 'external').toUpperCase()}\n`;
-    text += `Media URL: ${formData.media?.url || 'N/A'}\n`;
+
+    // Main Media
+    if (formData.media?.url) {
+        const rawName = decodeURIComponent(formData.media.url.split('/').pop().split('?')[0]);
+        const mediaName = rawName.includes('_') ? rawName.split('_').slice(1).join('_') : rawName;
+        text += `Media Filename: ${mediaName}\n`;
+        text += `Media URL: ${formData.media.url}\n`;
+    } else {
+        text += `Media URL: N/A\n`;
+    }
+
+    // Alt Text
     text += `Alt Text: ${formData.media?.alt_text || 'N/A'}\n`;
+
+    // Thumbnail
+    if (formData.media?.thumbnail_url) {
+        const rawThumb = decodeURIComponent(formData.media.thumbnail_url.split('/').pop().split('?')[0]);
+        const thumbName = rawThumb.includes('_') ? rawThumb.split('_').slice(1).join('_') : rawThumb;
+        text += `Thumbnail Filename: ${thumbName}\n`;
+        text += `Thumbnail URL: ${formData.media.thumbnail_url}\n`;
+    }
+
+    // Captions
+    if (formData.media?.caption_url) {
+        const captionName = decodeURIComponent(formData.media.caption_url.split('%2F').pop().split('?')[0]).split('_').slice(1).join('_');
+        text += `Caption Filename: ${captionName}\n`;
+        text += `Caption File: ${formData.media.caption_url}\n`;
+    }
     text += `\n`;
 
     // SCHEDULE

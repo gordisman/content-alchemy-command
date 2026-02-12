@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { storage, auth } from '../../lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 export default function IdeaEditorModal({ open, onClose, idea, onSave, onDelete }) {
     const { settings } = useSettings();
@@ -191,7 +191,17 @@ export default function IdeaEditorModal({ open, onClose, idea, onSave, onDelete 
         }
     };
 
-    const deleteAudio = () => {
+    const deleteAudio = async () => {
+        const oldUrl = formData.idea_audio_memo;
+        if (oldUrl && oldUrl.includes('firebasestorage.googleapis.com')) {
+            try {
+                const storageRef = ref(storage, oldUrl);
+                await deleteObject(storageRef);
+                toast.info("Previous audio memo cleaned from storage");
+            } catch (err) {
+                console.error("Cleanup failed:", err);
+            }
+        }
         setAudioBlob(null);
         setAudioURL(null);
         setFormData(prev => ({ ...prev, idea_audio_memo: '', idea_audio_memo_duration: 0 }));
@@ -375,6 +385,17 @@ export default function IdeaEditorModal({ open, onClose, idea, onSave, onDelete 
 
             // Upload Audio
             if (audioBlob) {
+                // CLEANUP OLD ASSET: If we have a new blob, delete the old cloud file first
+                if (formData.idea_audio_memo && formData.idea_audio_memo.includes('firebasestorage.googleapis.com')) {
+                    try {
+                        const oldRef = ref(storage, formData.idea_audio_memo);
+                        await deleteObject(oldRef);
+                        console.log("Cleanup: Old audio memo purged during replacement.");
+                    } catch (e) {
+                        console.warn("Cleanup failed during audio replacement:", e);
+                    }
+                }
+
                 console.log("Starting upload for user:", auth.currentUser.uid);
                 const extension = audioBlob.name ? audioBlob.name.split('.').pop() : 'webm';
                 const filename = `audio_memos/${Date.now()}_audio.${extension}`;

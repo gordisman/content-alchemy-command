@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { format, addDays } from "date-fns";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, Download, CalendarIcon, Loader2, Save, Trash2, Clock, Link as LinkIcon, Image as ImageIcon, ExternalLink, FileText, Plus, Play, Pause, Mic, Sparkles, Eye, StopCircle, Upload, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Check, ArrowUpRight, Globe, Cloud, Database, Box, HardDrive, Laptop, Repeat } from "lucide-react";
+import { Copy, Download, CalendarIcon, Loader2, Save, Trash2, Clock, Link as LinkIcon, Image as ImageIcon, ExternalLink, FileText, Plus, Play, Pause, Mic, Sparkles, Eye, StopCircle, Upload, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, Check, ArrowUpRight, Globe, Repeat, X } from "lucide-react";
 import { generateReviewText } from '../../utils/postReviewFormatter';
 import {
     AlertDialog,
@@ -27,11 +27,59 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { storage, auth } from '../../lib/firebase';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref } from 'firebase/storage';
 import { SORTED_PLATFORMS } from '../../config/platforms';
 import { formatPostId } from '../../utils/postIdFormatter';
 import PostReviewOverlay from './PostReviewOverlay';
 import YouTubePlaylistSelector from './YouTubePlaylistSelector';
+import MediaAssetEngine from './MediaAssetEngine';
+import AudioAssetEngine from './AudioAssetEngine';
+
+const detectMediaSource = (url) => {
+    if (!url) return 'external';
+    if (url.includes('firebasestorage.googleapis.com')) return 'firebase';
+    if (url.includes('cloudinary.com')) return 'cloudinary';
+    if (url.includes('drive.google.com')) return 'gdrive';
+    if (url.includes('dropbox.com')) return 'dropbox';
+
+    // Local File Path Heuristics (Windows/Unix)
+    if (url.match(/^[a-zA-Z]:\\/) || url.startsWith('/') || url.startsWith('file://')) return 'local';
+
+    return 'external';
+};
+
+const detectMediaType = (fileOrUrl) => {
+    // 1. OBJECT CHECK (Promoted Resources or File Objects)
+    if (typeof fileOrUrl === 'object') {
+        const typeValue = fileOrUrl?.type || '';
+        const mimeType = fileOrUrl?.mimeType || ''; // For legacy/custom objects
+
+        // Check if it's already classified
+        if (['video', 'image', 'document'].includes(typeValue)) return typeValue;
+
+        // Check MIME types (standard File objects use .type)
+        if (typeValue.startsWith('video/') || mimeType.startsWith('video/')) return 'video';
+        if (typeValue.startsWith('image/') || mimeType.startsWith('image/')) return 'image';
+        if (typeValue.startsWith('application/pdf') || mimeType.startsWith('application/pdf') ||
+            typeValue.includes('word') || typeValue.includes('officedocument') || typeValue.includes('text/plain')) return 'document';
+
+        if (typeValue === 'link' || typeValue === 'web_link' || typeValue === 'gdrive') return 'link';
+    }
+
+    // 2. URL STRING ANALYSIS
+    const urlStr = typeof fileOrUrl === 'string' ? fileOrUrl : fileOrUrl?.uri || fileOrUrl?.name || '';
+    if (!urlStr) return 'image';
+
+    // Strip query params/fragments
+    const name = urlStr.split(/[#?]/)[0];
+    const ext = name.split('.').pop().toLowerCase();
+
+    if (['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv'].includes(ext)) return 'video';
+    if (['pdf', 'doc', 'docx', 'txt', 'ppt', 'pptx', 'xls', 'xlsx'].includes(ext)) return 'document';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'].includes(ext)) return 'image';
+
+    return 'link';
+};
 
 export default function PostEditorModal({ open, onClose, post, idea, ideas = [], allPosts = [], onSave, onDelete, initialPlatform, onUpdateIdea, pillars = [], settings = {}, onViewManifesto }) {
     const [formData, setFormData] = useState({
@@ -63,6 +111,9 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
         repurpose_date: null
     });
 
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+    const [lightboxMedia, setLightboxMedia] = useState(null);
+
     const [searchParams, setSearchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState("content");
     const [directEntryDraft, setDirectEntryDraft] = useState({ post_title: '', content_text: '' });
@@ -72,26 +123,15 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
     const [showReview, setShowReview] = useState(false);
 
     // Audio Recorder State
-    const [isRecording, setIsRecording] = useState(false);
-    const [audioBlob, setAudioBlob] = useState(null);
-    const [audioURL, setAudioURL] = useState(null);
-    const mediaRecorderRef = useRef(null);
-    const audioChunksRef = useRef([]);
-    const timerRef = useRef(null);
-    const [recordingDuration, setRecordingDuration] = useState(0);
+    // Audio Post Player State (Legacy - kept for reference if needed elsewhere)
+    const [isPostPlaying, setIsPostPlaying] = useState(false);
+    const postAudioPlayerRef = useRef(null);
 
     // Audio Post Player State
-    const [isPostPlaying, setIsPostPlaying] = useState(false);
     const [postCurrentTime, setPostCurrentTime] = useState(0);
 
-    // Media Asset Engine State
-    const mediaFileInputRef = useRef(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [isMediaUploading, setIsMediaUploading] = useState(false);
-    const [previewError, setPreviewError] = useState(null);
-    const [postPlayerDuration, setPostPlayerDuration] = useState(0);
+    // Media Asset Engine State (Now inside MediaAssetEngine.jsx)
     const [postPlaybackRate, setPostPlaybackRate] = useState(1);
-    const postAudioPlayerRef = useRef(null);
 
     // Audio Idea Player State
     const [isIdeaPlaying, setIsIdeaPlaying] = useState(false);
@@ -175,17 +215,14 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
 
                     // Ensure resources has links array even if post saved it differently or it's missing
                     resources: post.resources || { links: [], idea_ref: '' },
-                    media: post.media || { url: '', alt_text: '', type: 'image', source: 'external' },
+                    media: post.media || { url: '', alt_text: '', type: 'image', source: 'external', caption_url: '' },
                     is_locked: post.is_locked || false,
                     is_evergreen: post.is_evergreen || false,
                     repurpose_date: post.repurpose_date ? (post.repurpose_date.seconds ? new Date(post.repurpose_date.seconds * 1000) : new Date(post.repurpose_date)) : null
                 });
                 if (post.post_audio_memo) {
-                    setAudioURL(post.post_audio_memo);
-                } else {
-                    setAudioURL(null);
+                    // Local state not needed, AudioAssetEngine reads from formData
                 }
-                setAudioBlob(null);
             } else if (activeIdea) {
                 // SPAWNING NEW POST FROM IDEA
                 setFormData({
@@ -209,7 +246,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                         idea_ref: activeIdea.id
                     },
 
-                    media: { url: '', alt_text: '', type: 'image', source: 'external' }
+                    media: { url: '', alt_text: '', type: 'image', source: 'external', caption_url: '' }
                 });
             } else {
                 // DIRECT ENTRY (No Post, No Idea)
@@ -230,7 +267,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                         links: [],
                         idea_ref: ''
                     },
-                    media: { url: '', alt_text: '', type: 'image', source: 'external' }
+                    media: { url: '', alt_text: '', type: 'image', source: 'external', caption_url: '' }
                 });
             }
 
@@ -250,24 +287,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
     // Audio & Player Cleanup on Close/Unmount
     useEffect(() => {
         return () => {
-            // Stop recording if active
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-                try {
-                    mediaRecorderRef.current.stop();
-                    mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-                } catch (e) {
-                    console.log("Audio cleanup error:", e);
-                }
-            }
-            if (timerRef.current) clearInterval(timerRef.current);
-            setIsRecording(false);
-            setRecordingDuration(0);
-
-            // Stop playback
-            if (postAudioPlayerRef.current) {
-                postAudioPlayerRef.current.pause();
-                setIsPostPlaying(false);
-            }
+            // Stop idea playback if active
             if (ideaAudioPlayerRef.current) {
                 ideaAudioPlayerRef.current.pause();
                 setIsIdeaPlaying(false);
@@ -430,19 +450,9 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
 
         setLoading(true);
         try {
-            let finalAudioUrl = audioURL && !audioBlob ? audioURL : '';
-
-            // 1. Upload Audio if a new blob exists
-            if (audioBlob) {
-                const extension = audioBlob.name ? audioBlob.name.split('.').pop() : 'webm';
-                const filename = `post_audio_memos/${Date.now()}_audio.${extension}`;
-                const storageRef = ref(storage, filename);
-                const snapshot = await uploadBytes(storageRef, audioBlob);
-                finalAudioUrl = await getDownloadURL(snapshot.ref);
-            }
-
-            // 2. Determine duration
-            const finalDuration = recordingDuration > 0 ? recordingDuration : (postPlayerDuration > 0 ? postPlayerDuration : (post?.post_audio_memo_duration || 0));
+            // No longer uploading audio here - handled in background by AudioAssetEngine
+            const finalAudioUrl = formData.post_audio_memo || '';
+            const finalDuration = formData.post_audio_memo_duration || 0;
 
             // Flatten the structure to match schema expectations where strict fields exist
             const layoutToSave = {
@@ -587,50 +597,6 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
         });
     }
 
-    // --- Player Logic (Shared for Idea/Post memos) ---
-
-    // --- Player Logic (Post) ---
-    const togglePostPlayback = () => {
-        if (!postAudioPlayerRef.current) return;
-        if (isPostPlaying) {
-            postAudioPlayerRef.current.pause();
-            setIsPostPlaying(false);
-        } else {
-            postAudioPlayerRef.current.play();
-            setIsPostPlaying(true);
-        }
-    };
-
-    const handlePostTimeUpdate = () => {
-        if (postAudioPlayerRef.current) {
-            setPostCurrentTime(postAudioPlayerRef.current.currentTime);
-        }
-    };
-
-    const handlePostLoadedMetadata = () => {
-        if (postAudioPlayerRef.current) {
-            const dur = postAudioPlayerRef.current.duration;
-            if (isFinite(dur)) setPostPlayerDuration(dur);
-        }
-    };
-
-    const handlePostSeek = (e) => {
-        const time = parseFloat(e.target.value);
-        if (postAudioPlayerRef.current && isFinite(time)) {
-            postAudioPlayerRef.current.currentTime = time;
-            setPostCurrentTime(time);
-        }
-    };
-
-    const togglePostSpeed = () => {
-        const rates = [1, 1.5, 2, 0.5];
-        const nextRate = rates[(rates.indexOf(postPlaybackRate) + 1) % rates.length];
-        setPostPlaybackRate(nextRate);
-        if (postAudioPlayerRef.current) {
-            postAudioPlayerRef.current.playbackRate = nextRate;
-        }
-    };
-
     // --- Player Logic (Idea) ---
     const toggleIdeaPlayback = () => {
         if (!ideaAudioPlayerRef.current) return;
@@ -665,13 +631,14 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
         const mediaType = formData.media?.type || 'image';
         const mediaSource = formData.media?.source || 'external';
         const isDownloadable = ['image', 'video', 'document'].includes(mediaType) && mediaSource !== 'gdrive';
-        const hasThumbnail = mediaType === 'video' && formData.media?.thumbnail_url;
+        const hasThumbnail = !!formData.media?.thumbnail_url;
         const isExternalSource = mediaSource === 'external';
 
         // Criteria: Are we downloading a Main Asset OR a Thumbnail?
         const willDownloadMedia =
             (formData.media?.url && isDownloadable && !isExternalSource) || // Main Asset
-            (hasThumbnail); // Thumbnail
+            (hasThumbnail) || // Thumbnail
+            (formData.media?.caption_url); // Captions
 
         if (willDownloadMedia) {
             setBundleConfirmOpen(true);
@@ -699,8 +666,8 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                 formData: { ...formData, pillarName: selectedPillar?.name },
                 idea: currentIdea,
                 postId: displayedPostId,
-                postAudioURL: audioURL,
-                postAudioDuration: postPlayerDuration || recordingDuration || post?.post_audio_memo_duration || 0,
+                postAudioURL: formData.post_audio_memo || '',
+                postAudioDuration: formData.post_audio_memo_duration || post?.post_audio_memo_duration || 0,
                 resolvedPlaylists,
                 settings
             });
@@ -708,8 +675,20 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
             // 1. Copy Comprehensive Text
             try {
                 await navigator.clipboard.writeText(reviewText);
+
+                const mediaType = formData.media?.type || 'image';
+                const mediaSource = formData.media?.source || 'external';
+                const isDownloadable = ['image', 'video', 'document'].includes(mediaType) && mediaSource !== 'gdrive';
+                const isExternalSource = mediaSource === 'external';
+                const willDownloadMedia =
+                    (formData.media?.url && isDownloadable && !isExternalSource) ||
+                    (!!formData.media?.thumbnail_url) ||
+                    (!!formData.media?.caption_url);
+
                 toast.success("Post Data Copied", {
-                    description: "Full assembly is now on your clipboard."
+                    description: willDownloadMedia
+                        ? "Full assembly is now on your clipboard."
+                        : "Text content copied. No vault assets found for download."
                 });
             } catch (err) {
                 console.warn("Clipboard write failed:", err);
@@ -760,13 +739,13 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                     // Fallback to new tab
                     window.open(formData.media.url, '_blank');
                 }
-            } else if (isExternalSource) {
+            } else if (isExternalSource && formData.media?.url) {
                 toast.info("External Link Detected", { description: "Main asset is external. Valid link copied to clipboard." });
             }
 
             // --- STAGE 3: THUMBNAIL DOWNLOAD (Independent) ---
             // Completely decoupled from Stage 2.
-            if (mediaType === 'video' && formData.media?.thumbnail_url) {
+            if (formData.media?.thumbnail_url) {
                 // Short delay to prevent browser throttling concurrent downloads
                 setTimeout(async () => {
                     try {
@@ -791,209 +770,52 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                 }, 500);
             }
 
+
+
+            // --- STAGE 4: CAPTION DOWNLOAD (Independent) ---
+            if (formData.media?.caption_url) {
+                // Staggered delay to prevent browser throttling
+                setTimeout(async () => {
+                    try {
+                        toast.info("Downloading Captions", { description: "Transferring subtitle file..." });
+                        const capUrl = formData.media.caption_url;
+                        const capResponse = await fetch(capUrl);
+                        if (!capResponse.ok) throw new Error(`HTTP ${capResponse.status}`);
+                        const capBlob = await capResponse.blob();
+
+                        // Detect extension from blob or url
+                        const mime = capBlob.type;
+                        let ext = 'srt';
+                        if (capUrl.includes('.vtt') || mime === 'text/vtt') ext = 'vtt';
+
+                        const capBlobUrl = window.URL.createObjectURL(capBlob);
+                        const capLink = document.createElement('a');
+                        capLink.href = capBlobUrl;
+                        capLink.download = `POST_${cleanIdForFile}_captions.${ext}`;
+                        document.body.appendChild(capLink);
+                        capLink.click();
+                        document.body.removeChild(capLink);
+                        window.URL.revokeObjectURL(capBlobUrl);
+                    } catch (e) {
+                        console.error("Caption download failed", e);
+                        toast.error("Caption Download Failed");
+                        window.open(formData.media.caption_url, '_blank');
+                    }
+                }, 1000);
+            }
+
         } catch (error) {
             console.error("Bundle Critical Failure:", error);
             toast.error("Process Logic Error");
         }
     };
 
-    // --- Idea Asset Promoter Logic ---
-    const handlePromoteResource = (resource) => {
-        setPreviewError(null);
-        if (!resource) return;
-        // ... rest of logic
-        if (!resource || !resource.uri) return;
-
-        // UNIFIED INTELLIGENCE: Use the same source/type detection as the rest of the app
-        const targetSource = detectMediaSource(resource.uri);
-
-        // Logic Fix: Trust the resource's existing type if it's already specific (image/video/document)
-        // rather than blindly re-detecting from a URL which might be a generic GDrive link.
-        let targetType = resource.type;
-        if (!targetType || targetType === 'link' || targetType === 'web_link') {
-            targetType = detectMediaType(resource.uri);
-        }
-
-        setFormData(prev => ({
-            ...prev,
-            media: {
-                ...prev.media,
-                url: resource.uri,
-                source: targetSource,
-                type: targetType,
-                alt_text: resource.label || prev.media.alt_text
-            }
-        }));
-
-        toast.success("Asset Promoted", {
-            description: targetSource === 'local'
-                ? `Linked "${resource.label}" as local reference.`
-                : targetSource === 'gdrive'
-                    ? `Linked "${resource.label}" as Drive reference.`
-                    : `Linked "${resource.label}" from Idea Resources.`
-        });
-    };
-
-    // --- Media Asset Engine Logic (Outstand Ready) ---
-
-    const detectMediaSource = (url) => {
-        if (!url) return 'external';
-        if (url.includes('firebasestorage.googleapis.com')) return 'firebase';
-        if (url.includes('cloudinary.com')) return 'cloudinary';
-        if (url.includes('drive.google.com')) return 'gdrive';
-        if (url.includes('dropbox.com')) return 'dropbox';
-
-        // Local File Path Heuristics (Windows/Unix)
-        if (url.match(/^[a-zA-Z]:\\/) || url.startsWith('/') || url.startsWith('file://')) return 'local';
-
-        return 'external';
-    };
-
-    const detectMediaType = (fileOrUrl) => {
-        // 1. OBJECT CHECK (Promoted Resources or File Objects)
-        if (typeof fileOrUrl === 'object') {
-            const typeValue = fileOrUrl?.type || '';
-            const mimeType = fileOrUrl?.mimeType || ''; // For legacy/custom objects
-
-            // Check if it's already classified
-            if (['video', 'image', 'document'].includes(typeValue)) return typeValue;
-
-            // Check MIME types (standard File objects use .type)
-            if (typeValue.startsWith('video/') || mimeType.startsWith('video/')) return 'video';
-            if (typeValue.startsWith('image/') || mimeType.startsWith('image/')) return 'image';
-            if (typeValue.startsWith('application/pdf') || mimeType.startsWith('application/pdf') ||
-                typeValue.includes('word') || typeValue.includes('officedocument') || typeValue.includes('text/plain')) return 'document';
-
-            if (typeValue === 'link' || typeValue === 'web_link' || typeValue === 'gdrive') return 'link';
-        }
-
-        // 2. URL STRING ANALYSIS
-        const urlStr = typeof fileOrUrl === 'string' ? fileOrUrl : fileOrUrl?.uri || fileOrUrl?.name || '';
-        if (!urlStr) return 'image';
-
-        // Strip query params/fragments
-        const name = urlStr.split(/[#?]/)[0];
-        const ext = name.split('.').pop().toLowerCase();
-
-        if (['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv'].includes(ext)) return 'video';
-        if (['pdf', 'doc', 'docx', 'txt', 'ppt', 'pptx', 'xls', 'xlsx'].includes(ext)) return 'document';
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'].includes(ext)) return 'image';
-
-        return 'link';
-    };
-
+    // --- Media Asset Engine Integration ---
     const detectedType = detectMediaType(formData.media?.url);
-    // Logic Fix: If the detected type is just a generic 'link', don't flag a mismatch against 
-    // a user-defined classification (like Image/Video). This respects the user's manual choice 
-    // for ambiguous URLs like Google Drive.
     const hasTypeMismatch = formData.media?.url &&
         detectedType !== 'link' &&
         (formData.media?.type || 'image') !== detectedType;
 
-    const handleMediaUpload = async (file) => {
-        if (!file) return;
-        setIsMediaUploading(true);
-        setPreviewError(null);
-        try {
-            const filename = `post_media/${Date.now()}_${file.name}`;
-            const storageRef = ref(storage, filename);
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-
-            setFormData(prev => ({
-                ...prev,
-                media: {
-                    ...prev.media,
-                    url: downloadURL,
-                    source: 'firebase',
-                    type: detectMediaType(file),
-                    is_purged: false
-                }
-            }));
-            toast.success("Media uploaded successfully!");
-        } catch (error) {
-            console.error("Media upload error:", error);
-            toast.error("Upload failed", { description: error.message });
-        } finally {
-            setIsMediaUploading(false);
-        }
-    };
-
-    // --- Thumbnail Logic ---
-    const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
-    const thumbnailInputRef = useRef(null);
-
-    const handleThumbnailUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        setIsThumbnailUploading(true);
-        try {
-            const filename = `post_thumbnails/${Date.now()}_${file.name}`;
-            const storageRef = ref(storage, filename);
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-
-            setFormData(prev => ({
-                ...prev,
-                media: {
-                    ...prev.media,
-                    thumbnail_url: downloadURL
-                }
-            }));
-            toast.success("Thumbnail attached");
-        } catch (error) {
-            console.error("Thumbnail upload error:", error);
-            toast.error("Thumbnail failed", { description: error.message });
-        } finally {
-            setIsThumbnailUploading(false);
-            // RESET INPUT: Allow re-uploading same file if needed
-            if (e.target) e.target.value = '';
-        }
-    };
-
-    const handleMediaFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            handleMediaUpload(file);
-            // RESET INPUT: Critical for "Delete -> Re-upload same file" flow
-            e.target.value = '';
-        }
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        setIsDragging(true);
-    };
-
-    const handleDragLeave = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) handleMediaUpload(file);
-    };
-
-    const handleMediaUrlChange = (url) => {
-        setPreviewError(null);
-        const newType = detectMediaType(url);
-        setFormData(prev => ({
-            ...prev,
-            media: {
-                ...prev.media,
-                url,
-                source: detectMediaSource(url),
-                type: newType,
-                // Fix: If detected type is NOT video, wipe thumbnail to prevent ghosting
-                thumbnail_url: newType === 'video' ? (prev.media.thumbnail_url || '') : '',
-                is_purged: false
-            }
-        }));
-    };
 
     const handleIdeaSeek = (e) => {
         const time = parseFloat(e.target.value);
@@ -1019,73 +841,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
         return `${minutes}:${seconds.toString().padStart(2, '0')} `;
     };
 
-    // --- Audio Recording Logic ---
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream);
-            audioChunksRef.current = [];
-
-            mediaRecorderRef.current.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data);
-                }
-            };
-
-            mediaRecorderRef.current.onstop = () => {
-                const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                setAudioBlob(blob);
-                const url = URL.createObjectURL(blob);
-                setAudioURL(url);
-                setFormData(prev => ({ ...prev, post_audio_memo_duration: recordingDuration }));
-            };
-
-            mediaRecorderRef.current.start();
-            setIsRecording(true);
-            setRecordingDuration(0);
-
-            timerRef.current = setInterval(() => {
-                setRecordingDuration(prev => prev + 1);
-            }, 1000);
-
-        } catch (err) {
-            console.error("Error accessing microphone:", err);
-            toast.error("Microphone Access Error", {
-                description: "Could not access microphone. Please check permissions."
-            });
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-            setIsRecording(false);
-            if (timerRef.current) clearInterval(timerRef.current);
-        }
-    };
-
-    const handleAudioUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const url = URL.createObjectURL(file);
-            setAudioBlob(file);
-            setAudioURL(url);
-            setFormData(prev => ({ ...prev, post_audio_memo: '', post_audio_memo_duration: 0 }));
-            setIsPostPlaying(false);
-            setPostCurrentTime(0);
-            setPostPlayerDuration(0);
-        }
-    };
-
-    const deleteAudio = () => {
-        setAudioBlob(null);
-        setAudioURL(null);
-        setFormData(prev => ({ ...prev, post_audio_memo: '', post_audio_memo_duration: 0 }));
-        setIsPostPlaying(false);
-        setPostCurrentTime(0);
-        setPostPlayerDuration(0);
-    };
+    // (Legacy recording logic removed - migrated to AudioAssetEngine)
 
     const [newResource, setNewResource] = useState({ label: '', uri: '', type: 'link' });
 
@@ -1360,105 +1116,11 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                                 />
                             </div>
 
-                            {/* Post Audio Memo Recorder */}
-                            <div className="space-y-3 p-4 bg-muted/20 rounded-lg border border-border/50 relative" onClick={handleLockedClick}>
-                                {formData.is_locked && <div className="absolute inset-0 z-50 cursor-pointer" />}
-                                <label className="text-sm font-medium flex items-center justify-between">
-                                    <span className="flex items-center gap-2"><Mic className="w-4 h-4 text-muted-foreground" /> Audio Memo (Post Level)</span>
-                                </label>
-
-                                {!audioURL && !isRecording && (
-                                    <div className="flex gap-2">
-                                        <Button type="button" variant="outline" className="flex-1 gap-2 h-9" onClick={startRecording}>
-                                            <Mic className="w-4 h-4" /> Start Recording
-                                        </Button>
-                                        <Button type="button" variant="secondary" className="gap-2 h-9 px-3" onClick={() => fileInputRef.current?.click()}>
-                                            <Upload className="w-4 h-4" /> Upload
-                                        </Button>
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            className="hidden"
-                                            accept=".mp3, .wav, .m4a, .aac, .aiff, audio/*"
-                                            onChange={handleAudioUpload}
-                                        />
-                                    </div>
-                                )}
-
-                                {isRecording && (
-                                    <Button type="button" variant="destructive" className="w-full gap-2 animate-pulse h-9" onClick={stopRecording}>
-                                        <StopCircle className="w-4 h-4" /> Stop Recording ({recordingDuration}s)
-                                    </Button>
-                                )}
-
-                                {audioURL && (
-                                    <div className="flex flex-col gap-2 bg-background p-3 rounded border border-border" onClick={handleLockedClick}>
-                                        <div className="flex items-center gap-3">
-                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={togglePostPlayback}>
-                                                {isPostPlaying ? <Pause className="w-4 h-4 fill-primary text-primary" /> : <Play className="w-4 h-4 fill-primary text-primary" />}
-                                            </Button>
-
-                                            <div className="flex-1 flex flex-col justify-center gap-2">
-                                                <div className="relative w-full h-4 flex items-center group">
-                                                    <input
-                                                        type="range"
-                                                        min="0"
-                                                        max={isFinite(postPlayerDuration) && postPlayerDuration > 0 ? postPlayerDuration : 100}
-                                                        value={isFinite(postCurrentTime) ? postCurrentTime : 0}
-                                                        onChange={handlePostSeek}
-                                                        step="0.05"
-                                                        className="absolute inset-0 w-full h-1.5 bg-transparent appearance-none cursor-pointer focus:outline-none z-10 
-                                                            [&::-webkit-slider-thumb]:appearance-none 
-                                                            [&::-webkit-slider-thumb]:w-3 
-                                                            [&::-webkit-slider-thumb]:h-3 
-                                                            [&::-webkit-slider-thumb]:rounded-full 
-                                                            [&::-webkit-slider-thumb]:bg-primary 
-                                                            [&::-webkit-slider-thumb]:shadow-[0_0_0_2px_hsl(var(--background))]
-                                                            [&::-webkit-slider-thumb]:transition-transform
-                                                            [&::-webkit-slider-thumb]:hover:scale-125
-                                                            [&::-moz-range-thumb]:w-3
-                                                            [&::-moz-range-thumb]:h-3
-                                                            [&::-moz-range-thumb]:border-none
-                                                            [&::-moz-range-thumb]:bg-primary
-                                                            "
-                                                        style={{
-                                                            background: `linear-gradient(to right, hsl(var(--primary)) ${(postCurrentTime / (postPlayerDuration || 1)) * 100}%, hsl(var(--secondary)) ${(postCurrentTime / (postPlayerDuration || 1)) * 100}%)`,
-                                                            borderRadius: '999px'
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                                                    <span>{formatTime(postCurrentTime)}</span>
-                                                    <span>{formatTime(postPlayerDuration || recordingDuration || (post?.post_audio_memo_duration || 0))}</span>
-                                                </div>
-                                            </div>
-
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 px-2 text-xs font-mono shrink-0 text-muted-foreground hover:text-foreground"
-                                                onClick={togglePostSpeed}
-                                            >
-                                                {postPlaybackRate}x
-                                            </Button>
-
-                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 shrink-0" onClick={deleteAudio}>
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-
-                                        <audio
-                                            ref={postAudioPlayerRef}
-                                            src={audioURL}
-                                            onTimeUpdate={handlePostTimeUpdate}
-                                            onLoadedMetadata={handlePostLoadedMetadata}
-                                            onEnded={() => setIsPostPlaying(false)}
-                                            className="hidden"
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                            <AudioAssetEngine
+                                formData={formData}
+                                setFormData={setFormData}
+                                isLocked={formData.is_locked}
+                            />
                         </TabsContent>
 
                         {/* PLATFORM TAB */}
@@ -1833,558 +1495,14 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                             </div>
 
                             {/* Universal Media Asset Engine */}
-                            <div className="space-y-4 pt-6 border-t mt-6 relative" onClick={handleLockedClick}>
-                                {formData.is_locked && <div className="absolute inset-0 z-50 cursor-pointer" />}
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-base font-semibold text-foreground flex items-center gap-2">
-                                        <ImageIcon className="w-5 h-5 text-indigo-500" />
-                                        Media / Assets (Final Output)
-                                    </Label>
-                                    <div className="flex items-center gap-2">
-                                        {/* Idea Asset Promoter Button */}
-                                        {(() => {
-                                            // Unified Calculation for Button Visibility
-                                            const rawPostRes = formData.resources;
-                                            const postResources = Array.isArray(rawPostRes) ? rawPostRes : (rawPostRes?.links || []);
-                                            const ideaResources = currentIdea?.resources || [];
-
-                                            const allResources = [...postResources, ...ideaResources].filter((item, index, self) =>
-                                                index === self.findIndex((t) => (t.uri === item.uri && t.label === item.label))
-                                            );
-
-                                            if (allResources.length === 0 || formData.is_locked) return null;
-
-                                            return (
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 border border-indigo-500/20">
-                                                            <Sparkles className="w-3 h-3" />
-                                                            Promote Resource
-                                                        </Button>
-                                                    </PopoverTrigger>
-
-                                                    {/* NOTE: We aren't controlling the open state directly here because Popover primitives 
-                                                        don't expose an easy 'close me' hook without a controlled prop. 
-                                                        Simple fix: Close using the internal Radix primitive behavior via a wrapper or assume user clicks away?
-                                                        Actually, Radix PopoverContent does NOT close on click inside by default.
-                                                        To fix the "Stays Open" bug, we must use `PopoverClose` or a controlled state.
-                                                        Since I can't easily rewrite the entire parent state in this small chunk, I'll use the
-                                                        Radix `PopoverClose` primitive if available, or just a Ref hack?
-                                                        NO, let's keep it simple: Add a CLICK LISTENER to the specific button.
-                                                        Actually, easier: adding `asChild` to a Close button works, but we are mapping.
-                                                        Let's use a hidden close button ref trigger.
-                                                     */}
-                                                    {/* BETTER FIX: Just rely on user clicking away for now? NO, user explicitly complained.
-                                                         Okay, to properly control it, I need to lift the `open` state.
-                                                         But I can't lift state easily in this snippet.
-                                                         Hack: Trigger a click on the document body or just wait? No.
-                                                         Let's assume the user will click the option.
-                                                         Wait, I can use `PopoverClose`.
-                                                      */}
-                                                    <PopoverContent align="end" className="w-72 p-2 bg-[#1a1a1a] border-border text-foreground">
-                                                        <div className="space-y-1">
-                                                            <h4 className="text-xs font-semibold text-muted-foreground px-2 py-1 uppercase tracking-wider">Available Resources</h4>
-                                                            {allResources.map((res, idx) => (
-                                                                <div key={idx} className="relative group">
-                                                                    {/* Main Click Action: Selects the resource. Ideally should close popover. */}
-                                                                    {/* We simulate Close by using PopoverClose ONLY if imported (checked imports: NO). 
-                                                                         So we must use a workaround or leave it open?
-                                                                         User HATES it open. 
-                                                                         Let's update the `handlePromoteResource` to use the `document.body.click()` trick? 
-                                                                         No, that's messy.
-                                                                         Let's just use the `asChild` pattern with a button that has the onClick?
-                                                                         Radix doesn't close on inner click unless it's a trigger?
-                                                                         actually, let's just create a `controlled` popover. I have enough context to add `open` state.
-                                                                     */}
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        className="w-full justify-start h-auto py-2 px-2 text-left text-sm font-normal truncate hover:bg-indigo-500/10 hover:text-indigo-300"
-                                                                        onClick={(e) => {
-                                                                            handlePromoteResource(res);
-                                                                            // Force close by simulating Escape key (standard Accessible pattern for modals/popovers)
-                                                                            // This is the cleanest "hack" without lifting state 200 lines up.
-                                                                            const esp = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
-                                                                            e.currentTarget.dispatchEvent(esp);
-                                                                        }}
-                                                                    >
-                                                                        <div className="flex items-center gap-2 truncate w-full">
-                                                                            {res.type === 'gdrive' || res.type === 'link' ? <LinkIcon className="w-3.5 h-3.5 shrink-0 opacity-70" /> : <ImageIcon className="w-3.5 h-3.5 shrink-0 opacity-70" />}
-                                                                            <span className="truncate">{res.label || "Untitled Resource"}</span>
-                                                                        </div>
-                                                                    </Button>
-                                                                    {/* Separate Open Link Action (The Up Arrow) */}
-                                                                    {res.uri && (
-                                                                        <div
-                                                                            role="button"
-                                                                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-white/10 text-muted-foreground hover:text-indigo-400 opacity-60 hover:opacity-100 transition-all cursor-pointer z-10"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                window.open(res.uri, '_blank');
-                                                                            }}
-                                                                            title="Open in new tab"
-                                                                        >
-                                                                            <ArrowUpRight className="w-3.5 h-3.5" />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </PopoverContent>
-                                                </Popover>
-                                            );
-                                        })()}
-                                        <Badge variant="outline" className="text-[10px] uppercase tracking-tighter border-indigo-500/30 text-indigo-400 bg-indigo-500/5 flex items-center gap-1.5">
-                                            <Sparkles className="w-2.5 h-2.5" />
-                                            <span>Universal Asset Metadata</span>
-                                        </Badge>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Drop Zone / Preview */}
-                                    <div
-                                        className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all duration-200 min-h-[180px] overflow-hidden group
-                                            ${isDragging ? 'border-indigo-500 bg-indigo-500/10 scale-[1.02]' : 'border-border/60 bg-muted/20 hover:border-indigo-500/40 hover:bg-indigo-500/5'}
-                                            ${formData.media?.url ? 'border-none p-0' : 'p-6'}
-                                            ${formData.is_locked ? "opacity-50 pointer-events-none cursor-not-allowed" : ""}
-                            `}
-                                        onDragOver={handleDragOver}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={handleDrop}
-                                        onClick={() => !formData.is_locked && mediaFileInputRef.current?.click()}
-                                    >
-                                        <input
-                                            type="file"
-                                            ref={mediaFileInputRef}
-                                            className="hidden"
-                                            onChange={handleMediaFileChange}
-                                            accept="image/*,video/*,application/pdf,.doc,.docx,.txt"
-                                            disabled={formData.is_locked}
-                                        />
-
-                                        {isMediaUploading ? (
-                                            <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in">
-                                                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-                                                <p className="text-xs font-medium text-indigo-400">Processing Media...</p>
-                                            </div>
-                                        ) : formData.media?.url ? (
-                                            /* Media Preview */
-                                            <div className="relative w-full h-full min-h-[180px] animate-in fade-in duration-500 bg-black/5 flex items-center justify-center rounded-xl cursor-copy">
-                                                {formData.media.source === 'local' ? (
-                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-amber-500/10 gap-3 border border-amber-500/30 rounded-xl p-4">
-                                                        <FileText className="w-12 h-12 text-amber-500" />
-                                                        <div className="text-center">
-                                                            <span className="text-xs font-bold text-amber-600 uppercase tracking-wider block mb-1">Local File Reference</span>
-                                                            <span className="text-[10px] font-mono truncate max-w-full px-4 text-muted-foreground block">{formData.media.url}</span>
-                                                        </div>
-                                                    </div>
-                                                ) : (formData.media.type === 'video' && formData.media.source !== 'gdrive' && formData.media.source !== 'external') ? (
-                                                    formData.media.is_purged ? (
-                                                        <div className="relative w-full h-full min-h-[180px] flex flex-col items-center justify-center p-6 bg-[#0f1115] border border-white/5 rounded-xl text-center group-hover:border-indigo-500/20 transition-colors">
-                                                            <div className="p-3 mb-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 shadow-[0_0_15px_-3px_rgba(99,102,241,0.2)]">
-                                                                <Database className="w-8 h-8 text-indigo-400" />
-                                                            </div>
-                                                            <h3 className="text-sm font-bold text-white mb-1">Video Purged</h3>
-                                                            <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[200px] mb-4">
-                                                                File removed to conserve storage space.
-                                                            </p>
-
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-7 text-[10px] uppercase font-bold tracking-wider border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    mediaFileInputRef.current?.click();
-                                                                }}
-                                                            >
-                                                                <Upload className="w-3 h-3 mr-1.5" />
-                                                                Upload Again
-                                                            </Button>
-                                                        </div>
-                                                    ) : !previewError && (
-                                                        <video
-                                                            src={formData.media.url}
-                                                            className="w-full h-full object-cover rounded-xl"
-                                                            controls
-                                                            onError={() => setPreviewError(true)}
-                                                        />
-                                                    )
-                                                ) : formData.media.type === 'document' && formData.media.source === 'firebase' ? (
-                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900 gap-3 border rounded-xl p-4 group">
-                                                        <FileText className="w-12 h-12 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                                                        <div className="text-center space-y-2">
-                                                            <span className="text-[10px] font-mono truncate max-w-full px-4 text-center block text-foreground/80">{formData.media.url.split('/').pop()}</span>
-                                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500/10 rounded-full opacity-60 group-hover:opacity-100 transition-opacity">
-                                                                <Upload className="w-3 h-3 text-indigo-500" />
-                                                                <span className="text-[9px] font-bold text-indigo-500 uppercase">Change File</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (formData.media.type === 'link' || formData.media.source === 'gdrive' || formData.media.source === 'external') ? (
-                                                    <div
-                                                        className="w-full h-full flex flex-col items-center justify-center bg-blue-500/10 gap-3 border border-blue-500/30 rounded-xl p-4 transition-colors group"
-                                                    >
-                                                        {formData.media.type === 'video' ? (
-                                                            <Play className="w-12 h-12 text-blue-500 group-hover:scale-110 transition-transform" />
-                                                        ) : formData.media.type === 'image' ? (
-                                                            <ImageIcon className="w-12 h-12 text-blue-500 group-hover:scale-110 transition-transform" />
-                                                        ) : formData.media.type === 'document' ? (
-                                                            <FileText className="w-12 h-12 text-blue-500 group-hover:scale-110 transition-transform" />
-                                                        ) : (
-                                                            <ExternalLink className="w-12 h-12 text-blue-500 group-hover:scale-110 transition-transform" />
-                                                        )}
-                                                        <div className="text-center">
-                                                            <span className="text-xs font-bold text-blue-500 uppercase tracking-wider block mb-1">
-                                                                {formData.media.source === 'gdrive' ? 'Google Drive Link' : 'External Link'}
-                                                            </span>
-                                                            <div className="text-[10px] font-mono truncate max-w-[200px] mx-auto px-4 text-blue-400/80 block">
-                                                                {formData.media.url}
-                                                            </div>
-                                                            <div className="mt-4 flex items-center gap-2 px-3 py-1 bg-blue-500/5 rounded border border-blue-500/20 group-hover:border-blue-500/40 transition-colors">
-                                                                <Upload className="w-3 h-3 text-blue-400" />
-                                                                <span className="text-[9px] text-blue-400 uppercase font-bold tracking-tight">Click to Upload Real File</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    !previewError && (
-                                                        <img
-                                                            src={formData.media.url}
-                                                            className="w-full h-full object-contain rounded-xl"
-                                                            alt="Preview"
-                                                            onError={() => setPreviewError(true)}
-                                                        />
-                                                    )
-                                                )}
-
-                                                {previewError && (
-                                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/20 backdrop-blur-sm rounded-xl pointer-events-none group-error">
-                                                        {/* Only show Error Text/Icon if it's NOT a simple mismatch fix */}
-                                                        {!hasTypeMismatch && (
-                                                            <>
-                                                                <AlertTriangle className="w-8 h-8 mb-2 text-muted-foreground" />
-                                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                                                    Preview Unavailable
-                                                                </span>
-                                                                <span className="text-[9px] text-muted-foreground/60 mt-1 mb-3 text-center px-4">
-                                                                    Resource may be private or restricted
-                                                                </span>
-                                                            </>
-                                                        )}
-
-                                                        <div className="flex flex-col items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-                                                            {/* Primary Fix: Switch View */}
-                                                            {hasTypeMismatch && (
-                                                                <Button
-                                                                    variant="default"
-                                                                    size="sm"
-                                                                    className="h-7 text-[10px] font-bold uppercase tracking-wider bg-amber-500 hover:bg-amber-600 text-white shadow-lg pointer-events-auto"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setPreviewError(null);
-                                                                        setFormData(p => ({
-                                                                            ...p,
-                                                                            media: {
-                                                                                ...p.media,
-                                                                                type: detectedType,
-                                                                                alt_text: '' // clear alt text as semantic meaning changes
-                                                                            }
-                                                                        }));
-                                                                    }}
-                                                                >
-                                                                    Switch to {detectedType} View
-                                                                </Button>
-                                                            )}
-
-                                                            {/* Secondary: Replace File */}
-                                                            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-background/80 shadow-sm border rounded-full pointer-events-auto cursor-pointer hover:bg-background transition-colors">
-                                                                <Upload className="w-3 h-3 text-indigo-500" />
-                                                                <span className="text-[9px] font-bold text-indigo-500 uppercase">Click to Replace</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Permanent Clear Button (Top Right) */}
-                                                {!formData.is_locked && (
-                                                    <div className="absolute top-2 right-2 flex gap-2">
-                                                        <Button
-                                                            variant="destructive"
-                                                            size="sm"
-                                                            className="h-8 gap-2 bg-red-600 hover:bg-red-700 shadow-lg px-2 rounded-md"
-                                                            onClick={async (e) => {
-                                                                e.stopPropagation();
-                                                                const currentUrl = formData.media?.url;
-                                                                const currentSource = formData.media?.source;
-
-                                                                // Physical Deletion from Firebase
-                                                                if (currentSource === 'firebase' && currentUrl) {
-                                                                    try {
-                                                                        const decodeUrl = decodeURIComponent(currentUrl);
-                                                                        const pathPart = decodeUrl.split('/o/')[1]?.split('?')[0];
-                                                                        if (pathPart) {
-                                                                            const fileRef = ref(storage, pathPart);
-                                                                            await deleteObject(fileRef);
-                                                                            toast.info("Physical file removed from Storage");
-                                                                        }
-                                                                    } catch (err) {
-                                                                        console.error("Failed to physically delete:", err);
-                                                                    }
-                                                                }
-                                                                setFormData(p => ({
-                                                                    ...p,
-                                                                    media: {
-                                                                        ...p.media,
-                                                                        url: '',
-                                                                        source: 'external',
-                                                                        type: 'image',
-                                                                        alt_text: ''
-                                                                    }
-                                                                }));
-                                                                setPreviewError(null);
-                                                                toast.success("Media cleared");
-                                                            }}
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                            <span className="text-[10px] font-bold">CLEAR</span>
-                                                        </Button>
-                                                    </div>
-                                                )}
-
-                                                {/* Source Marker (Bottom Right) */}
-                                                <div className="absolute bottom-2 right-2">
-                                                    <Badge variant="secondary" className="bg-black/60 text-white/90 text-[9px] uppercase font-mono border-white/10 backdrop-blur-md">
-                                                        {formData.media.source}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            /* Empty State */
-                                            <div className="text-center group-hover:scale-105 transition-transform duration-300">
-                                                <div className="p-3 rounded-full bg-indigo-500/10 inline-block mb-3">
-                                                    <Upload className="w-6 h-6 text-indigo-500" />
-                                                </div>
-                                                <p className="text-sm font-medium text-foreground">Launch-Ready Assets</p>
-                                                <p className="text-[11px] text-muted-foreground mt-1 px-4">Upload the final physical video/image file here</p>
-                                                <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-500/5 border border-indigo-500/10 text-[9px] font-bold text-indigo-400 uppercase tracking-tight">
-                                                    <Sparkles className="w-2.5 h-2.5" /> Required for "Copy Bundle" download
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Asset Metadata */}
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1.5">
-                                                <div className="flex items-center justify-between">
-                                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest">Media Type</Label>
-                                                    {hasTypeMismatch && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="h-4 px-1 text-[8px] border-amber-500/50 text-amber-500 bg-amber-500/5 animate-pulse cursor-help"
-                                                            title={`Detected extension suggests this is a ${detectedType} `}
-                                                        >
-                                                            <div className="flex items-center gap-1">
-                                                                <AlertTriangle className="w-2.5 h-2.5" />
-                                                                <span>Mismatch</span>
-                                                            </div>
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <Select
-                                                    value={formData.media?.type || 'image'}
-                                                    onValueChange={v => {
-                                                        setPreviewError(null);
-                                                        setFormData(p => ({
-                                                            ...p,
-                                                            media: {
-                                                                ...p.media,
-                                                                type: v,
-                                                                // Clear Alt Text to prevent context drift
-                                                                alt_text: '',
-                                                                // STRICT WIPE: Always clear thumbnail and url on type change. No history.
-                                                                thumbnail_url: '',
-                                                                url: ''
-                                                            }
-                                                        }));
-                                                    }}
-                                                    disabled={formData.is_locked}
-                                                >
-                                                    <SelectTrigger className="h-9 text-xs">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="image">
-                                                            <div className="flex items-center gap-2">
-                                                                <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
-                                                                <span>Image</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                        <SelectItem value="video">
-                                                            <div className="flex items-center gap-2">
-                                                                <Play className="w-3.5 h-3.5 text-indigo-500" />
-                                                                <span>Video</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                        <SelectItem value="document">
-                                                            <div className="flex items-center gap-2">
-                                                                <FileText className="w-3.5 h-3.5 text-amber-500" />
-                                                                <span>Document</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                        <SelectItem value="link">
-                                                            <div className="flex items-center gap-2">
-                                                                <LinkIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                                                                <span>External Link / Reference</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                {hasTypeMismatch && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        className="h-5 px-0 text-[10px] text-amber-500 hover:text-amber-600 hover:bg-transparent flex items-center gap-1 mt-1 font-bold animate-in fade-in slide-in-from-top-1"
-                                                        onClick={() => {
-                                                            setPreviewError(null);
-                                                            setFormData(p => ({ ...p, media: { ...p.media, type: detectedType } }));
-                                                        }}
-                                                        disabled={formData.is_locked}
-                                                    >
-                                                        <Sparkles className="w-2.5 h-2.5" />
-                                                        SYNC WITH FILE
-                                                    </Button>
-                                                )}
-                                            </div>
-
-                                            {/* CELL 2: Custom Thumbnail (Video Only) */}
-                                            {formData.media?.type === 'video' ? (
-                                                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
-                                                    <Label className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest flex items-center justify-between">
-                                                        <span>Custom Thumbnail</span>
-                                                        {formData.media.thumbnail_url && (
-                                                            <span className="text-[9px] text-emerald-500 font-bold flex items-center gap-1">
-                                                                <CheckCircle2 className="w-3 h-3" /> Attached
-                                                            </span>
-                                                        )}
-                                                    </Label>
-
-                                                    <div
-                                                        className={`relative h-24 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden transition-all
-                                                            ${formData.media.thumbnail_url ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border/60 bg-muted/20 hover:border-indigo-500/40 hover:bg-indigo-500/5'}
-                                                        `}
-                                                        onClick={() => !formData.is_locked && thumbnailInputRef.current?.click()}
-                                                    >
-                                                        <input
-                                                            type="file"
-                                                            ref={thumbnailInputRef}
-                                                            className="hidden"
-                                                            accept="image/*"
-                                                            onChange={handleThumbnailUpload}
-                                                            disabled={formData.is_locked}
-                                                        />
-
-                                                        {isThumbnailUploading ? (
-                                                            <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
-                                                        ) : formData.media.thumbnail_url ? (
-                                                            <div className="relative w-full h-full group cursor-pointer">
-                                                                <img
-                                                                    src={formData.media.thumbnail_url}
-                                                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                                                                    alt="Thumbnail"
-                                                                />
-                                                                {!formData.is_locked && (
-                                                                    <div className="absolute top-1 right-1">
-                                                                        <Button
-                                                                            variant="destructive"
-                                                                            size="icon"
-                                                                            className="h-6 w-6 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                setFormData(p => ({
-                                                                                    ...p,
-                                                                                    media: { ...p.media, thumbnail_url: '' }
-                                                                                }));
-                                                                            }}
-                                                                        >
-                                                                            <Trash2 className="w-3 h-3" />
-                                                                        </Button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center gap-1 text-muted-foreground/50 hover:text-indigo-400 transition-colors cursor-pointer">
-                                                                <ImageIcon className="w-5 h-5" />
-                                                                <span className="text-[9px] font-bold uppercase tracking-wide">Upload Cover</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="hidden md:block" /> /* Spacer for desktop alignment if needed, or collapse */
-                                            )}
-                                        </div>
-
-                                        {/* ROW 2: Storage Source (Full Width to prevent layout jumping) */}
-                                        <div className="space-y-1.5 pt-1">
-                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest">Storage Source</Label>
-                                            <Select
-                                                value={formData.media?.source || 'external'}
-                                                onValueChange={v => setFormData(p => ({ ...p, media: { ...p.media, source: v } }))}
-                                                disabled={formData.is_locked}
-                                            >
-                                                <SelectTrigger className="h-9 text-xs w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="firebase"><div className="flex items-center gap-2"><Cloud className="w-3.5 h-3.5 text-orange-500" /><span>Firebase Storage</span></div></SelectItem>
-                                                    <SelectItem value="external"><div className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-blue-500" /><span>External Link</span></div></SelectItem>
-                                                    <SelectItem value="gdrive"><div className="flex items-center gap-2"><ImageIcon className="w-3.5 h-3.5 text-green-500" /><span>Google Drive</span></div></SelectItem>
-                                                    <SelectItem value="dropbox"><div className="flex items-center gap-2"><Box className="w-3.5 h-3.5 text-blue-400" /><span>Dropbox</span></div></SelectItem>
-                                                    <SelectItem value="local"><div className="flex items-center gap-2"><Laptop className="w-3.5 h-3.5 text-gray-500" /><span>Local Path</span></div></SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest">Media / Output URL</Label>
-                                            <div className="relative group">
-                                                <Input
-                                                    className="h-9 text-xs pr-8 group-hover:border-indigo-500/50 transition-colors"
-                                                    placeholder="https://..."
-                                                    value={formData.media?.url || ''}
-                                                    onChange={(e) => handleMediaUrlChange(e.target.value)}
-                                                    disabled={formData.is_locked}
-                                                />
-                                                <LinkIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity" />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center gap-1.5">
-                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest">Alt Text / Description</Label>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="ghost" className="h-4 w-4 p-0 rounded-full">
-                                                            <div className="text-[8px] font-bold border border-muted-foreground/50 text-muted-foreground/50 w-3 h-3 flex items-center justify-center rounded-full leading-none">?</div>
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-64 p-3 text-[11px] leading-relaxed">
-                                                        <h4 className="font-bold mb-1">Why Alt Text?</h4>
-                                                        <p className="text-muted-foreground">Used by screen readers for accessibility and search engines for SEO. Describe what is in the image/video briefly but accurately.</p>
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </div>
-                                            <Input
-                                                className="h-9 text-xs"
-                                                placeholder="e.g. Graphic illustrating the 3 pillars of alchemy..."
-                                                value={formData.media?.alt_text || ''}
-                                                onChange={(e) => setFormData({ ...formData, media: { ...formData.media, alt_text: e.target.value } })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <MediaAssetEngine
+                                formData={formData}
+                                setFormData={setFormData}
+                                currentIdea={currentIdea}
+                                setIsLightboxOpen={setIsLightboxOpen}
+                                setLightboxMedia={setLightboxMedia}
+                                detectMediaType={detectMediaType}
+                            />
                         </TabsContent>
 
                         <TabsContent value="resources" className="flex-1 p-6 space-y-6 mt-0 flex flex-col">
@@ -2415,71 +1533,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
 
                                 {/* RESOURCES LIST (Unified) */}
                                 <div className="border rounded-md bg-background p-2 space-y-2 max-h-[400px] overflow-y-auto">
-                                    {/* POST AUDIO MEMO (Always visible if exists) */}
-                                    {audioURL && (
-                                        <div className="p-3 border border-indigo-500/30 rounded bg-indigo-500/5 flex flex-col gap-2">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600">
-                                                    <Mic className="w-4 h-4" />
-                                                </div>
-                                                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">Post Audio Memo ({Math.round(recordingDuration || post?.post_audio_memo_duration || 0)}s)</span>
-                                            </div>
-
-                                            <div className="flex items-center gap-3 bg-background p-2 rounded border border-indigo-500/20">
-                                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-indigo-600 hover:bg-indigo-500/10" onClick={togglePostPlayback}>
-                                                    {isPostPlaying ? <Pause className="w-4 h-4 fill-indigo-600" /> : <Play className="w-4 h-4 fill-indigo-600" />}
-                                                </Button>
-
-                                                <div className="flex-1 flex flex-col justify-center gap-2">
-                                                    <div className="relative w-full h-4 flex items-center group">
-                                                        <input
-                                                            type="range"
-                                                            min="0"
-                                                            max={isFinite(postPlayerDuration) && postPlayerDuration > 0 ? postPlayerDuration : 100}
-                                                            value={isFinite(postCurrentTime) ? postCurrentTime : 0}
-                                                            onChange={handlePostSeek}
-                                                            step="0.05"
-                                                            className="absolute inset-0 w-full h-1.5 bg-transparent appearance-none cursor-pointer focus:outline-none z-10 
-                                                                [&::-webkit-slider-thumb]:appearance-none 
-                                                                [&::-webkit-slider-thumb]:w-3 
-                                                                [&::-webkit-slider-thumb]:h-3 
-                                                                [&::-webkit-slider-thumb]:rounded-full 
-                                                                [&::-webkit-slider-thumb]:bg-indigo-500 
-                                                                [&::-webkit-slider-thumb]:shadow-[0_0_0_2px_hsl(var(--background))]
-                                                            "
-                                                            style={{
-                                                                background: `linear-gradient(to right, #6366f1 ${(postCurrentTime / (postPlayerDuration || 1)) * 100}%, rgba(99, 102, 241, 0.1) ${(postCurrentTime / (postPlayerDuration || 1)) * 100}%)`,
-                                                                borderRadius: '999px'
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                                                        <span>{formatTime(postCurrentTime)}</span>
-                                                        <span>{formatTime(postPlayerDuration || recordingDuration || post?.post_audio_memo_duration || 0)}</span>
-                                                    </div>
-                                                </div>
-
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 px-2 text-xs font-mono shrink-0 text-muted-foreground hover:text-indigo-600"
-                                                    onClick={togglePostSpeed}
-                                                >
-                                                    {postPlaybackRate}x
-                                                </Button>
-                                            </div>
-
-                                            <audio
-                                                ref={postAudioPlayerRef}
-                                                src={audioURL}
-                                                className="hidden"
-                                                onTimeUpdate={handlePostTimeUpdate}
-                                                onLoadedMetadata={handlePostLoadedMetadata}
-                                                onEnded={() => setIsPostPlaying(false)}
-                                            />
-                                        </div>
-                                    )}
+                                    {/* Legacy Audio Player Removed - Handled by AudioAssetEngine */}
 
                                     {/* AUDIO PLAYER Explicit Section - Custom UI (Idea Level) */}
                                     {idea?.idea_audio_memo && (
@@ -2903,7 +1957,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                 </div>
 
                 {/* Footer */}
-                < DialogFooter className="p-4 pb-12 md:pb-4 border-t shrink-0 bg-background z-10" >
+                <DialogFooter className="p-4 pb-12 md:pb-4 border-t shrink-0 bg-background z-10">
                     {post && onDelete && (
                         <Button variant="ghost" onClick={() => onDelete(post)} className="mr-auto text-destructive hover:text-destructive/90">
                             <Trash2 className="w-4 h-4 mr-2" /> Delete
@@ -2916,7 +1970,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         Save Post
                     </Button>
-                </DialogFooter >
+                </DialogFooter>
 
                 <PostReviewOverlay
                     open={showReview}
@@ -2926,8 +1980,8 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                     settings={settings}
                     pillars={pillars}
                     postId={displayedPostId}
-                    postAudioURL={audioURL}
-                    postAudioDuration={recordingDuration || (post?.post_audio_memo_duration || 0)}
+                    postAudioURL={formData.post_audio_memo || ''}
+                    postAudioDuration={formData.post_audio_memo_duration || post?.post_audio_memo_duration || 0}
                 />
 
                 {/* Publish Confirmation */}
@@ -2967,16 +2021,77 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                         <AlertDialogHeader>
                             <AlertDialogTitle className="flex items-center gap-2 text-indigo-400">
                                 <Download className="w-5 h-5" />
-                                Initiate Bundle Transfer?
+                                Bundle Transfer Ready
                             </AlertDialogTitle>
                             <AlertDialogDescription className="text-gray-300">
-                                This action will:
-                                <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                                    <li><span className="text-white font-semibold">Copy Post Details</span> (Text, Metadata, & Media Links) to your Clipboard.</li>
-                                    <li><span className="text-white font-semibold">Initiate Downloads</span> for your Files (Video, Image, PDF, Thumbnail) via browser pop-up.</li>
-                                </ul>
-                                <br />
-                                Please allow the browser to save multiple files if prompted.
+                                <div className="space-y-4 mt-3">
+                                    {/* Asset Checklist */}
+                                    <div className="bg-white/5 rounded-md p-3 space-y-2 border border-white/5">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Assets Detected</p>
+
+                                        {/* Main Asset */}
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-slate-300">Main Media ({formData.media?.type || 'file'})</span>
+                                            {formData.media?.url && formData.media.source !== 'external' ? (
+                                                <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                                                </span>
+                                            ) : formData.media?.source === 'external' ? (
+                                                <span className="flex items-center gap-1.5 text-blue-400 text-xs font-medium bg-blue-400/10 px-2 py-0.5 rounded-full border border-blue-400/20">
+                                                    <LinkIcon className="w-3.5 h-3.5" /> External Link
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1.5 text-slate-500 text-xs font-medium bg-white/5 px-2 py-0.5 rounded-full">
+                                                    <X className="w-3.5 h-3.5" /> None
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Thumbnail */}
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-slate-300">Custom Thumbnail</span>
+                                            {formData.media?.thumbnail_url ? (
+                                                <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1.5 text-slate-500 text-xs font-medium bg-white/5 px-2 py-0.5 rounded-full">
+                                                    <X className="w-3.5 h-3.5" /> None
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Captions */}
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-slate-300">Caption File (.srt/.vtt)</span>
+                                            {formData.media?.caption_url ? (
+                                                <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1.5 text-slate-500 text-xs font-medium bg-white/5 px-2 py-0.5 rounded-full">
+                                                    <X className="w-3.5 h-3.5" /> None
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Warnings based on Context */}
+                                    {(!formData.media?.url || (!formData.media?.thumbnail_url && formData.media?.type === 'video')) && (
+                                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3 text-xs text-amber-200/80 flex items-start gap-2">
+                                            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                            <div className="space-y-1">
+                                                {!formData.media?.url && <p>• No main media file uploaded.</p>}
+                                                {!formData.media?.thumbnail_url && formData.media?.type === 'video' && <p>• No custom thumbnail for this video.</p>}
+                                                <p className="mt-1 opacity-70">You can proceed, but these assets won't be downloaded.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <p className="text-xs text-slate-400">
+                                        Clicking proceed will copy metadata to clipboard and download all "Ready" assets.
+                                    </p>
+                                </div>
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -2986,9 +2101,9 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                                     setBundleConfirmOpen(false);
                                     executeBundleProcess();
                                 }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white border-none font-bold"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white border-none font-bold min-w-[100px]"
                             >
-                                OK, Proceed
+                                Proceed
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -3005,8 +2120,6 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                             <AlertDialogDescription className="text-gray-400">
                                 You have <span className="text-white font-bold">"{formData.media.type}"</span> selected,
                                 but the file looks like a <span className="text-white font-bold text-amber-400">{detectedType}</span>.
-                                <br /><br />
-                                Do you want to save anyway?
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -3023,7 +2136,42 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-            </DialogContent >
-        </Dialog >
+
+                {/* LIGHTBOX OVERLAY */}
+                <Dialog open={isLightboxOpen} onOpenChange={(v) => {
+                    setIsLightboxOpen(v);
+                    if (!v) setLightboxMedia(null);
+                }}>
+                    <DialogContent className="max-w-[95vw] w-auto h-auto max-h-[95vh] p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
+                        <div className="relative flex items-center justify-center w-full h-full">
+                            {/* Close Button */}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute -top-12 right-0 z-50 text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                                onClick={() => setIsLightboxOpen(false)}
+                            >
+                                <X className="w-8 h-8" />
+                            </Button>
+
+                            {(lightboxMedia?.type || formData.media?.type) === 'video' ? (
+                                <video
+                                    src={lightboxMedia?.url || formData.media?.url}
+                                    className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl bg-black"
+                                    controls
+                                    autoPlay
+                                />
+                            ) : (
+                                <img
+                                    src={lightboxMedia?.url || formData.media?.url}
+                                    alt="Full Preview"
+                                    className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                                />
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </DialogContent>
+        </Dialog>
     );
 }

@@ -31,6 +31,8 @@ import {
     DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { storage } from '../lib/firebase';
+import { ref, deleteObject } from 'firebase/storage';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -146,6 +148,10 @@ export default function IdeaVault() {
             });
             return;
         }
+
+        // TRIGGER DIALOG
+        setIdeaToDelete(idea);
+        setDeleteDialogOpen(true);
     };
 
     // Selection Handlers
@@ -198,6 +204,19 @@ export default function IdeaVault() {
     const confirmDelete = async () => {
         if (ideaToDelete) {
             const idBadge = `#IDEA-${ideaToDelete.idea_number}`;
+
+            // DEEP PURGE: Delete associated audio memo from storage if it exists
+            if (ideaToDelete.idea_audio_memo && ideaToDelete.idea_audio_memo.includes('firebasestorage.googleapis.com')) {
+                try {
+                    const storageRef = ref(storage, ideaToDelete.idea_audio_memo);
+                    await deleteObject(storageRef);
+                    console.log("Deep Purge: Storage audio memo deleted for ", idBadge);
+                } catch (err) {
+                    console.error("Deep Purge failed for audio memo:", err);
+                    // We continue anyway so the record is still deleted
+                }
+            }
+
             try {
                 await deleteIdea(ideaToDelete.id);
                 toast.success(`Idea ${idBadge} Deleted`, {

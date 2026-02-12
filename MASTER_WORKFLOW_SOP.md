@@ -122,47 +122,56 @@ You don't need to memorize these (you can always ask me to run them), but here i
 
 ---
 
-## 🌙 The "Goodnight" Shutdown Routine
-Before you turn off your PC for the night, follow these 3 steps to ensure a perfect start tomorrow:
+### 🚢 Deployment Protocol: Gord First, Then Client
 
-### 1. Final Cloud Sync
-If you've made changes today, push them to GitHub. This is your "Off-site Backup."
-*   **Command:** `git add .`, `git commit -m "daily wrap up"`, `git push origin main`
+We **NEVER** deploy directly to a client environment (like Laurie) without verifying it on your production environment first. This is our strict safety protocol.
 
-### 2. Stop the Local Engine
-Go to your terminal where `dev:all` is running and press:
-*   **Keyboard:** `Ctrl + C`
-*   *(If asked "Terminate batch job?", type `y` and Enter).*
-*   **If it's stubborn:** Press `Ctrl + C` rapidly 3-4 times. 
-*   **The "Kill Switch":** If it still won't stop, click the **Trash Can icon** in the top-right of the terminal panel to force-close everything.
-*   **Why:** This closes the ports (5173, 8080, etc.) so they aren't "stuck" when you reboot tomorrow.
+#### 1. The "Gord-First" Standard
+1.  **Switch to Gord:** `npm run env:gord`
+2.  **Build:** `npm run build`
+3.  **Target Gord:** `firebase use cac-prod-gord`
+4.  **Deploy:** `firebase deploy --only hosting`
+5.  **VERIFY:** Open `https://cac-prod-gord.web.app` and test the new feature.
 
-### 3. Close & Sleep
-Now you can safely close VS Code and shut down your computer. Your code is safe on your disk and on GitHub!
+#### 2. The "Green Light" Promotion
+Only AFTER you have verified the feature on Gord's site do we proceed to the client.
+1.  **Switch to Laurie:** `npm run env:laurie`
+2.  **Re-Build:** `npm run build` (Crucial to bake in her specific settings)
+3.  **Target Laurie:** `firebase use cac-prod-laurie`
+4.  **Deploy:** `firebase deploy --only hosting`
 
 ---
 
-### 🚢 Fleet Management: Deploying to Multiple Clients
+## ✅ The Code Promotion Checklist (Wrap-Up)
 
-Once you have multiple clients (like **Laurie**), you have two strategies for updates.
+Before finishing a "Code Promotion" session, we must always complete this checklist to ensure safety and history:
 
-#### Strategy A: The "Fleet Release" (Automatic) - CURRENT SETUP
-In this mode, pushing to GitHub updates EVERYONE at once. 
-*   **Pros:** Very fast, zero extra work.
-*   **Cons:** If there's a bug, it hits everyone at the same time.
-*   **Commands:** `git push` (Updates Gord & Laurie simultaneously).
+1.  **Status Check:** Run `git status` to see what changed.
+2.  **Stage Files:** Run `git add .` to prepare the changes.
+3.  **Commit:** Run `git commit -m "feat: description of changes"` to save the history.
+4.  **Push:** Run `git push origin main` to back it up to GitHub.
+5.  **Data Backup:** Run `npm run save` OR use the Emulator UI (see below) to save your local test data.
 
-#### Strategy B: The "Staged Release" (Manual Promotion) - RECOMMENDED
-This is what we will use to give you the control you asked for. You update yourself first, then "promote" to the client.
-1.  **Update Gord:** Push your code. Only Gord's site updates.
-2.  **Test:** verify everything is perfect on your live site.
-3.  **Promote to Laurie:** Either manually trigger the Laurie deployment or "enable" her in the code list.
+---
 
-#### 🛠️ Client-Specific Local Commands
-I have added these shortcuts to your project so you can "inhabit" Laurie's world locally:
-*   `npm run env:laurie`: Swaps your local keys to point to Laurie's production database.
-*   `npm run env:gord`: Swaps back to your production database.
-*   `npm run env:dev`: Swaps back to the local fake/test database.
+## 🌙 The "Goodnight" Shutdown Routine
+Before you turn off your PC for the night, follow these steps:
+
+### 1. Data Export (Critical)
+If `Ctrl + C` or `npm run save` is giving you trouble, use the **Fail-Safe Method**:
+1.  Open your browser to the **Emulator UI**: `http://localhost:4000` (or `4001`).
+2.  Also check `http://localhost:8080/ui` if the main UI isn't loading.
+3.  **Click "Export Data"**: There should be a button in the Emulator UI to export data.
+4.  **Verify:** Check that the folder `.firebase/emulators` has recent timestamps.
+
+### 2. Stop the Engine
+Go to your terminal where `dev:all` is running and press:
+*   **Keyboard:** `Ctrl + C` (multiple times if needed).
+*   **The "Kill Switch":** Click the **Trash Can icon** in the terminal panel to force-close. 
+
+### 3. Local Environment Reset (Optional)
+If you finished a deployment session, it's good practice to switch back to DEV so you don't accidentally edit PROD next time:
+*   **Command:** `npm run env:dev`
 
 ---
 

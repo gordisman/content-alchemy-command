@@ -56,10 +56,10 @@ export default function PostReviewOverlay({ open, onClose, formData, idea, setti
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="bg-[#0f0f0f] border-white/10 text-white max-w-3xl h-[85vh] overflow-hidden flex flex-col p-6">
+            <DialogContent className="bg-[#0f0f0f] border-white/10 text-white max-w-3xl h-[85vh] overflow-hidden flex flex-col p-4 sm:p-6">
                 <DialogHeader className="flex-shrink-0 mb-4">
-                    <div className="flex items-center justify-between">
-                        <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-y-2">
+                        <DialogTitle className="text-white text-xl font-bold flex items-center gap-2 mr-2">
                             Post Review
                         </DialogTitle>
                         <Button
@@ -67,7 +67,7 @@ export default function PostReviewOverlay({ open, onClose, formData, idea, setti
                             className="bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20 transition-all active:scale-95"
                         >
                             <Copy className="w-4 h-4 mr-2" />
-                            Copy All to Clipboard
+                            Copy All <span className="hidden sm:inline ml-1">to Clipboard</span>
                         </Button>
                     </div>
                 </DialogHeader>
@@ -147,40 +147,90 @@ export default function PostReviewOverlay({ open, onClose, formData, idea, setti
                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-white/10 pb-2">
                                 UNIVERSAL MEDIA METADATA
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-400 mb-1.5 text-[10px] uppercase tracking-wider">Asset Type & Source:</p>
-                                    <div className="flex gap-2 mb-3">
-                                        <Badge variant="outline" className="bg-purple-500/10 border-purple-500/30 text-purple-400 text-[10px] uppercase font-mono">
-                                            {formData.media?.type || 'image'}
-                                        </Badge>
-                                        <Badge variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-400 text-[10px] uppercase font-mono">
-                                            {formData.media?.source || 'external'}
-                                        </Badge>
+                            <div className="grid grid-cols-1 gap-4">
+                                {/* MAIN MEDIA DISPLAY */}
+                                <div className="p-3 bg-white/5 rounded-lg border border-white/5 space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Main Asset</p>
+                                        <div className="flex gap-2">
+                                            <Badge variant="outline" className="bg-purple-500/10 border-purple-500/30 text-purple-400 text-[10px] uppercase font-mono">
+                                                {formData.media?.type || 'image'}
+                                            </Badge>
+                                            <Badge variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-400 text-[10px] uppercase font-mono">
+                                                {formData.media?.source || 'external'}
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    <p className="text-xs font-semibold text-slate-400 mb-1.5">Media URL:</p>
-                                    <div className="bg-white/5 p-3 rounded-md border border-white/5 flex items-center justify-between group">
-                                        <p className="text-sm text-slate-200 truncate pr-2">
-                                            {formData.media?.url || <span className="italic text-slate-500">N/A</span>}
-                                        </p>
+
+                                    <div className="flex items-center justify-between bg-black/20 p-2 rounded border border-white/5">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            {formData.media?.type === 'video' ? <Play className="w-4 h-4 text-indigo-400 shrink-0" /> :
+                                                formData.media?.type === 'document' ? <FileText className="w-4 h-4 text-amber-400 shrink-0" /> :
+                                                    <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />}
+                                            <p className="text-sm text-slate-200 truncate font-mono">
+                                                {formData.media?.url ? (
+                                                    decodeURIComponent(formData.media.url.split('/').pop().split('?')[0]).includes('_')
+                                                        ? decodeURIComponent(formData.media.url.split('/').pop().split('?')[0]).split('_').slice(1).join('_')
+                                                        : decodeURIComponent(formData.media.url.split('/').pop().split('?')[0])
+                                                ) : <span className="italic text-slate-500">No file attached</span>}
+                                            </p>
+                                        </div>
                                         {formData.media?.url && (
-                                            <a
-                                                href={formData.media.url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-slate-500 hover:text-indigo-400 transition-colors shrink-0"
-                                            >
-                                                <ExternalLink className="w-3.5 h-3.5" />
+                                            <a href={formData.media.url} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-indigo-400 transition-colors p-1">
+                                                <ExternalLink className="w-4 h-4" />
                                             </a>
                                         )}
                                     </div>
+
+                                    {/* Alt Text / Description Context */}
+                                    {formData.media?.alt_text && (
+                                        <div className="text-xs text-slate-400 pl-1 border-l-2 border-slate-700">
+                                            <span className="font-semibold text-slate-500 mr-2">ALT:</span>
+                                            {formData.media.alt_text}
+                                        </div>
+                                    )}
                                 </div>
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-400 mb-1.5">Alt Text:</p>
-                                    <p className="text-sm text-slate-200 bg-white/5 p-3 rounded-md border border-white/5 min-h-[44px] leading-relaxed">
-                                        {formData.media?.alt_text || <span className="italic text-slate-500">N/A</span>}
-                                    </p>
-                                </div>
+
+                                {/* SECONDARY ASSETS GRID */}
+                                {(formData.media?.thumbnail_url || formData.media?.caption_url) && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* THUMBNAIL */}
+                                        {formData.media?.thumbnail_url && (
+                                            <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Custom Thumbnail</p>
+                                                <div className="flex items-center justify-between bg-black/20 p-2 rounded border border-white/5 group">
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                        <ImageIcon className="w-4 h-4 text-pink-400 shrink-0" />
+                                                        <p className="text-xs text-pink-200 font-mono truncate">
+                                                            {decodeURIComponent(formData.media.thumbnail_url.split('%2F').pop().split('?')[0]).split('_').slice(1).join('_')}
+                                                        </p>
+                                                    </div>
+                                                    <a href={formData.media.thumbnail_url} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-pink-400 transition-colors">
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* CAPTIONS */}
+                                        {formData.media?.caption_url && (
+                                            <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Caption File</p>
+                                                <div className="flex items-center justify-between bg-black/20 p-2 rounded border border-white/5 group">
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                        <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                                                        <p className="text-xs text-emerald-200 font-mono truncate">
+                                                            {decodeURIComponent(formData.media.caption_url.split('%2F').pop().split('?')[0]).split('_').slice(1).join('_')}
+                                                        </p>
+                                                    </div>
+                                                    <a href={formData.media.caption_url} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-emerald-400 transition-colors">
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
