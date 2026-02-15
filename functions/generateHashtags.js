@@ -1,28 +1,22 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const functions = require("firebase-functions"); // For config()
+const functions = require("firebase-functions");
 const { OpenAI } = require("openai");
 
-exports.generateHashtags = onCall(async (request) => {
+exports.generateHashtags = functions.region("us-central1").https.onCall(async (data, context) => {
     // 1. Setup & Auth
-    const data = request.data;
-    const auth = request.auth;
-
-    console.log("🚀 GENERATE HASHTAGS FUNCTION HIT!");
+    console.log("🚀 GENERATE HASHTAGS FUNCTION HIT (V1)!");
     console.log("Data:", data);
 
-    if (!auth) {
-        throw new HttpsError(
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
             "unauthenticated",
             "User must be logged in to generate hashtags."
         );
     }
 
     // 2. Initialize OpenAI
-    // Note: functions.config() is legacy but compatible. 
-    // Ideally migrate to params/secrets later.
     const apiKey = functions.config().openai?.key;
     if (!apiKey) {
-        throw new HttpsError(
+        throw new functions.https.HttpsError(
             "failed-precondition",
             "OpenAI API Key is missing in configuration."
         );
@@ -34,7 +28,7 @@ exports.generateHashtags = onCall(async (request) => {
     const { title, content, pillarName, platform } = data;
 
     if (!title && !content) {
-        throw new HttpsError(
+        throw new functions.https.HttpsError(
             "invalid-argument",
             "Post must have a Title or Content to generate tags."
         );
@@ -80,12 +74,11 @@ exports.generateHashtags = onCall(async (request) => {
         });
 
         const hashtags = completion.choices[0].message.content.trim();
-
         return { hashtags };
 
     } catch (error) {
         console.error("OpenAI Error:", error);
-        throw new HttpsError(
+        throw new functions.https.HttpsError(
             "internal",
             "Failed to generate hashtags from OpenAI.",
             error.message
