@@ -218,15 +218,7 @@ exports.dailyActionAlert = onSchedule({
     await runAlertLogic("scheduled");
 });
 
-/**
- * SEND TEST ALERT - CALLABLE (Manual Trigger)
- */
-exports.sendTestAlert = onCall({
-    secrets: ["GMAIL_APP_PASSWORD"]
-}, async (request) => {
-    // Auth Check? We can assume internal for now or check request.auth
-    return await runAlertLogic("manual");
-});
+
 
 exports.manageStorageRetention = require("./manageStorageRetention").manageStorageRetention;
 
