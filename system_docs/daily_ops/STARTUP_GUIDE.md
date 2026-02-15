@@ -36,9 +36,15 @@ To ensure your work is saved exactly where it needs to be:
 2. **Shutdown**: Go back to the first terminal and press `Ctrl + C` **once**.
 3. **Ignore Ghost Folders**: If you see new `firebase-export-XXXXXXXX` folders appear, don't worry. The next time you run `npm run dev:all`, they will be automatically merged back into your project.
 
-## 🚑 Emergency Data Recovery
-If `npm run dev:all` fails to find your data:
-1. Run `npm run finalize` in the terminal.
-2. This manually triggers the data restoration logic.
-4.  **Full System Restore**: If you need to recover from a JSON backup file (e.g., after a fresh install), see the [Data Recovery Procedure](./DATA_RECOVERY.md).
+
+## 🌎 Switching Worlds (Production vs. Sandbox)
+The system is designed to switch between different Firebase environments seamlessly. **NEVER deploy the site without checking your world first.**
+
+1. **Check Status**: `npm run env`
+2. **Go to Sandbox (Dev)**: `npm run env:dev` + `firebase use default`
+3. **Go to Gord's Prod**: `npm run env:gord` + `firebase use gord`
+4. **Go to Laurie's Prod**: `npm run env:laurie` + `firebase use laurie`
+
+> [!WARNING]
+> Always run `npm run env:dev` when you are done with production work to ensure you don't accidentally save test data to a live project!
 

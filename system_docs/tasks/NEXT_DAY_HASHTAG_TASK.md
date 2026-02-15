@@ -11,6 +11,17 @@
 - [x] `firebase.js` is using standard connection logic.
 - [x] Feature works in local emulator (Approved by Gord).
 
+#### ✅ FINAL STATUS: COMPLETED (Feb 14, 2026)
+
+- [x] **PHASE 1: Local & Security** (Verified Gord's production key using V1 stability)
+- [x] **PHASE 2: Deploy Gord Prod** (Success after index.js consolidation)
+- [x] **PHASE 3: Deploy Laurie Prod** (Success using switch-env scripts)
+
+### 💡 Deployment Lessons Learned
+- **Consolidation**: Moving all Cloud Functions into `index.js` solved "require" and "analysis" errors during Firebase deploy.
+- **Protocol Stability**: Used `functions.region().https.onCall` (V1) to avoid permission/IAM issues common with V2/Cloud Run on existing projects.
+- **Environment Management**: Verified `npm run env:[project]` is the reliable way to swap identities before building.
+
 ### 2. Deploy to Gord Prod (`cac-gord-prod`)
 - [ ] Swtich Project:
   ```bash
