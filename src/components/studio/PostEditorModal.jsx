@@ -26,14 +26,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { storage, auth } from '../../lib/firebase';
+import { storage, auth, functions } from '../../lib/firebase';
 import { ref } from 'firebase/storage';
+import { httpsCallable } from 'firebase/functions';
 import { SORTED_PLATFORMS } from '../../config/platforms';
 import { formatPostId } from '../../utils/postIdFormatter';
 import PostReviewOverlay from './PostReviewOverlay';
 import YouTubePlaylistSelector from './YouTubePlaylistSelector';
 import MediaAssetEngine from './MediaAssetEngine';
 import AudioAssetEngine from './AudioAssetEngine';
+import { exportSinglePost } from '../../utils/backup_utility';
 
 const detectMediaSource = (url) => {
     if (!url) return 'external';
@@ -91,6 +93,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
         publish_time: '09:00',
         definitive_pillar: '',
         post_cta: '',
+        generated_hashtags: '', // New Field
         action_notes: '',
 
         // This object stores all the flat fields from post-schema.json
@@ -139,6 +142,8 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
     const [ideaPlayerDuration, setIdeaPlayerDuration] = useState(0);
     const [ideaPlaybackRate, setIdeaPlaybackRate] = useState(1);
     const ideaAudioPlayerRef = useRef(null);
+
+    const [isGeneratingTags, setIsGeneratingTags] = useState(false); // Loading state for AI
 
     const fileInputRef = useRef(null);
 
@@ -204,6 +209,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                     publish_time: post.publish_time || '09:00',
                     definitive_pillar: post.definitive_pillar || '',
                     post_cta: post.post_cta || '',
+                    generated_hashtags: post.generated_hashtags || '',
                     action_notes: post.action_notes || '',
 
                     // Load all schema fields into platform_fields for editing
@@ -478,6 +484,7 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                 publish_time: formData.status === 'draft' ? null : formData.publish_time,
                 definitive_pillar: formData.definitive_pillar,
                 post_cta: formData.post_cta,
+                generated_hashtags: formData.generated_hashtags || '', // Ensure never undefined
                 action_notes: formData.action_notes,
 
                 post_audio_memo: finalAudioUrl,
@@ -550,7 +557,10 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
             }
         } catch (error) {
             console.error("Failed to save post:", error);
-            toast.error("Failed to save post");
+            toast.error("Failed to save post", {
+                description: error.message || "Unknown error occurred.",
+                duration: 8000
+            });
         } finally {
             setLoading(false);
         }
@@ -619,6 +629,36 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
         if (ideaAudioPlayerRef.current) {
             const dur = ideaAudioPlayerRef.current.duration;
             if (isFinite(dur)) setIdeaPlayerDuration(dur);
+        }
+    };
+
+    // --- AI HASHTAG GENERATION ---
+    const handleGenerateHashtags = async () => {
+        // Validation: Need at least Title or Body
+        if (!formData.post_title && !formData.content_text) {
+            toast.error("Content Missing", { description: "Please add a Title or Content to generate hashtags." });
+            return;
+        }
+
+        setIsGeneratingTags(true);
+        try {
+            const generateHashtagsFn = httpsCallable(functions, 'generateHashtags');
+            const result = await generateHashtagsFn({
+                title: formData.post_title,
+                content: formData.content_text,
+                platform: formData.platform,
+                pillarName: pillars.find(p => p.id === formData.definitive_pillar)?.name || ''
+            });
+
+            if (result.data?.hashtags) {
+                setFormData(prev => ({ ...prev, generated_hashtags: result.data.hashtags }));
+                toast.success("Hashtags Generated", { description: "AI has crafted tags for this post." });
+            }
+        } catch (error) {
+            console.error("Hashtag Generation Failed:", error);
+            toast.error("Generation Failed", { description: error.message || "Could not generate hashtags." });
+        } finally {
+            setIsGeneratingTags(false);
         }
     };
 
@@ -1103,6 +1143,56 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                                     onChange={(e) => setFormData({ ...formData, post_cta: e.target.value })}
                                     disabled={formData.is_locked}
                                 />
+                            </div>
+
+                            {/* HASHTAG GENERATOR SECTION */}
+                            <div className="space-y-2 p-4 bg-muted/30 rounded-lg border border-border/50 relative" onClick={handleLockedClick}>
+                                {formData.is_locked && <div className="absolute inset-0 z-50 cursor-pointer" />}
+                                <div className="flex items-center justify-between">
+                                    <Label className="flex items-center gap-2 text-indigo-400">
+                                        <Sparkles className="w-4 h-4" />
+                                        Hashtags
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                        {formData.generated_hashtags && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs text-muted-foreground hover:text-white"
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // prevent lock click
+                                                    navigator.clipboard.writeText(formData.generated_hashtags);
+                                                    toast.success("Copied to Clipboard");
+                                                }}
+                                            >
+                                                <Copy className="w-3 h-3 mr-1" /> Copy
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-xs border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-400"
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // prevent lock click
+                                                handleGenerateHashtags();
+                                            }}
+                                            disabled={isGeneratingTags || formData.is_locked}
+                                        >
+                                            {isGeneratingTags ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                                            {formData.generated_hashtags ? 'Regenerate AI Tags' : 'Generate AI Tags'}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <Textarea
+                                    placeholder="#contentalchemy #strategy..."
+                                    value={formData.generated_hashtags}
+                                    onChange={(e) => handleTextChange('generated_hashtags', e.target.value)}
+                                    disabled={formData.is_locked}
+                                    className="font-mono text-xs text-muted-foreground min-h-[60px]"
+                                />
+                                <p className="text-[10px] text-muted-foreground">
+                                    AI analyzes your Title, Content, and Pillar to generate optimized tags for {SORTED_PLATFORMS.find(p => p.id === formData.platform)?.label || 'this platform'}.
+                                </p>
                             </div>
 
                             {/* Action Notes - Critical */}
@@ -1957,20 +2047,28 @@ export default function PostEditorModal({ open, onClose, post, idea, ideas = [],
                 </div>
 
                 {/* Footer */}
-                <DialogFooter className="p-4 pb-12 md:pb-4 border-t shrink-0 bg-background z-10">
-                    {post && onDelete && (
-                        <Button variant="ghost" onClick={() => onDelete(post)} className="mr-auto text-destructive hover:text-destructive/90">
-                            <Trash2 className="w-4 h-4 mr-2" /> Delete
-                        </Button>
-                    )
-                    }
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                <div className="flex justify-between items-center p-4 pb-12 md:pb-4 border-t shrink-0 bg-background z-10">
+                    <div className="flex items-center gap-2">
+                        {post && onDelete && (
+                            <Button variant="ghost" onClick={() => onDelete(post)} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10">
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                            </Button>
+                        )}
+                        {post && (
+                            <Button variant="ghost" onClick={() => exportSinglePost(post)} className="text-muted-foreground hover:text-primary" title="Download JSON Snapshot">
+                                <Download className="w-4 h-4" />
+                            </Button>
+                        )}
+                    </div>
 
-                    <Button onClick={handleSave} disabled={loading} className="min-w-[120px]">
-                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Save Post
-                    </Button>
-                </DialogFooter>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button onClick={handleSave} disabled={loading} className="min-w-[120px]">
+                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Save Post
+                        </Button>
+                    </div>
+                </div>
 
                 <PostReviewOverlay
                     open={showReview}

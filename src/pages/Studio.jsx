@@ -17,6 +17,7 @@ import { Lane } from '../components/studio/Lane';
 import { PlatformCard } from '../components/studio/PlatformCard';
 import BacklogCard from '../components/studio/BacklogCard';
 import PostEditorModal from '../components/studio/PostEditorModal';
+import IdeaEditorModal from '../components/vault/IdeaEditorModal';
 import IdeaManifestoModal from '../components/studio/IdeaManifestoModal';
 import { SORTED_PLATFORMS } from '../config/platforms';
 import { formatPostId } from '../utils/postIdFormatter';
@@ -126,6 +127,7 @@ export default function Studio() {
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
     const [spawnIdea, setSpawnIdea] = useState(null);
+    const [editingIdea, setEditingIdea] = useState(null);
     const [manifestoIdea, setManifestoIdea] = useState(null); // Idea for Manifesto Modal
     const [targetPlatform, setTargetPlatform] = useState(null);
     const [filterPlatform, setFilterPlatform] = useState('all'); // 'all' or platformId
@@ -571,6 +573,7 @@ export default function Studio() {
                                                 settings={settings}
                                                 // Keep original props for fallback/compatibility
                                                 onMoveTo={(platform) => handleSpawnWithPlatform(idea.id, platform)}
+                                                onEdit={() => setEditingIdea(idea)} // Pass handler for IdeaEditor
                                                 onReturnToIncubation={() => handleReturnToIncubating(idea)}
                                             />
                                         ))
@@ -825,6 +828,26 @@ export default function Studio() {
                         onClose={() => setManifestoIdea(null)}
                         idea={manifestoIdea}
                         pillars={settings?.content_pillars || []}
+                    />
+
+                    <IdeaEditorModal
+                        open={!!editingIdea}
+                        onClose={() => setEditingIdea(null)}
+                        idea={editingIdea}
+                        onSave={async (data) => {
+                            if (editingIdea?.id) {
+                                await updateIdea(editingIdea.id, data);
+                                setEditingIdea(null);
+                                toast.success("Idea updated");
+                            }
+                        }}
+                        onDelete={async (ideaToDelete) => {
+                            if (ideaToDelete?.id) {
+                                await updateIdea(ideaToDelete.id, { status: 'archived', archived_at: new Date() });
+                                setEditingIdea(null);
+                                toast.success("Idea archived");
+                            }
+                        }}
                     />
 
                     <AlertDialog open={!!deleteDetails} onOpenChange={(open) => !open && setDeleteDetails(null)}>

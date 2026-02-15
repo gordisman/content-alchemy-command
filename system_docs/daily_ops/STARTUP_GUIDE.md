@@ -40,5 +40,5 @@ To ensure your work is saved exactly where it needs to be:
 If `npm run dev:all` fails to find your data:
 1. Run `npm run finalize` in the terminal.
 2. This manually triggers the data restoration logic.
-3. Restart with `npm run dev:all`.
+4.  **Full System Restore**: If you need to recover from a JSON backup file (e.g., after a fresh install), see the [Data Recovery Procedure](./DATA_RECOVERY.md).
 

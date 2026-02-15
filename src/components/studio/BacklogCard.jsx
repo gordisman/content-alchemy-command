@@ -2,7 +2,7 @@ import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, MoveRight, Lightbulb } from 'lucide-react';
+import { MoreVertical, MoveRight, Lightbulb, FileEdit } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,6 +15,7 @@ import { SORTED_PLATFORMS } from '../../config/platforms';
 export default function BacklogCard({
     idea,
     onMoveTo,
+    onEdit,
     onReturnToIncubation,
     pillar,
     settings = {}
@@ -76,6 +77,10 @@ export default function BacklogCard({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-border">
+                            <DropdownMenuItem onClick={() => onEdit(idea)} className="cursor-pointer">
+                                <FileEdit className="w-3 h-3 mr-2 text-indigo-400" />
+                                Edit Idea
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={onReturnToIncubation} className="text-amber-400 focus:text-amber-300">
                                 <Lightbulb className="w-3 h-3 mr-2" />
                                 Incubate

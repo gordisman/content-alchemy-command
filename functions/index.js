@@ -230,3 +230,5 @@ exports.sendTestAlert = onCall({
 
 exports.manageStorageRetention = require("./manageStorageRetention").manageStorageRetention;
 
+exports.generateHashtags = require("./generateHashtags").generateHashtags;
+

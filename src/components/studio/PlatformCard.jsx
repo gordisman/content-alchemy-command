@@ -1,4 +1,4 @@
-import { Calendar as CalendarIcon, MoreHorizontal, Edit, Trash2, Sparkles, MoveRight, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, MoreHorizontal, Edit, Trash2, Sparkles, MoveRight, Clock, Download } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,

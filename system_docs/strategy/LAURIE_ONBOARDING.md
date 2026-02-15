@@ -1,4 +1,4 @@
-# Welcome to Content Alchemy Studio, Laurie! 🎨✨
+# Welcome to Content Alchemy Command, Laurie! 🚀✨
 
 Your dedicated production environment is live and ready for your strategy work.
 
@@ -11,7 +11,7 @@ Depending on your preference, you can choose one of two methods:
 3.  **Verification:** Check your inbox for a verification email and click the link to activate your account.
 
 ### Option B: Google Account
-1.  **One-Click:** If you prefer to use a personal Gmail account, simply click the **"Sign in with Google"** button. This will instantly link your Google account to the Studio.
+1.  **One-Click:** If you prefer to use a personal Gmail account, simply click the **"Sign in with Google"** button. This will instantly link your Google account to the Command Center.
 
 ## 🛡️ Administrative Rights
 Your account has been pre-authorized as an **Administrator**. Once you log in, you will have full access to:

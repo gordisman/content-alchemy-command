@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSettings } from '../hooks/useSettings';
 import { runSystemAudit } from '../utils/auditor';
 import { seedDatabase } from '../utils/seeder';
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { auditDatabase } from '../utils/audit_db';
 import { initializeSystemDefaults } from '../utils/master_seed';
 import { clearPostData } from '../utils/cleanup_utility';
+import { exportSystemData, restoreSystemData } from '../utils/backup_utility';
 import { seedHighConfidenceData } from '../utils/high_confidence_seeder';
 import { Switch } from "@/components/ui/switch";
 import StrategyAllocationMatrix from '../components/settings/StrategyAllocationMatrix';
@@ -274,7 +275,8 @@ export default function Settings() {
         setConfirmDialog({
             open: true,
             title: "⛔ DANGER: SYSTEM RESET",
-            description: "This will WIPE and RESET the entire system configuration to Golden Data defaults (Lanes, Pillars, Sets, Matrix). This cannot be undone.",
+            description: "This will WIPE and RESET the entire system configuration to Golden Data defaults (Lanes, Pillars, Sets, Matrix). \n\nThis preserves your Posts and Ideas, but resets all settings.",
+            confirmKeyword: "RESET",
             variant: "destructive",
             onConfirm: async () => {
                 setInitLoading(true);
@@ -294,6 +296,42 @@ export default function Settings() {
             }
         });
     };
+
+    // ...
+
+    const handleClearPosts = () => {
+        setConfirmDialog({
+            open: true,
+            title: "🗑️ WIPE CONTENT DATA",
+            description: "Are you sure? This will PERMANENTLY DELETE all Posts and Ideas, and reset your Post ID counters to zero.\n\nThis does NOT affect your Pillars or Matrix Settings.",
+            confirmKeyword: "DELETE",
+            variant: "destructive",
+            onConfirm: async () => {
+                try {
+                    toast.info("Clearing content...");
+                    const res = await clearPostData();
+                    if (res.success) {
+                        toast.success("Content Wiped", { description: res.log });
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        toast.error("Wipe Failed", { description: res.error });
+                    }
+                } catch (err) {
+                    toast.error("Wipe Failed", { description: err.message });
+                }
+            }
+        });
+    };
+
+    // ... in JSX
+
+    <Button
+        variant="destructive"
+        size="sm"
+        onClick={handleClearPosts}
+    >
+        Wipe Content Only
+    </Button>
 
     const handleSaveAlerts = async () => {
         // Validation: Check recipients against Authorized Users
@@ -414,28 +452,6 @@ export default function Settings() {
     };
 
 
-    const handleClearPosts = () => {
-        setConfirmDialog({
-            open: true,
-            title: "🗑️ WIPE CONTENT DATA",
-            description: "Are you sure? This will PERMANENTLY DELETE all Posts and Ideas, and reset your Post ID counters to zero. This does NOT affect your Pillars or Matrix Settings.",
-            variant: "destructive",
-            onConfirm: async () => {
-                try {
-                    toast.info("Clearing content...");
-                    const res = await clearPostData();
-                    if (res.success) {
-                        toast.success("Content Wiped", { description: res.log });
-                        setTimeout(() => window.location.reload(), 1500);
-                    } else {
-                        toast.error("Wipe Failed", { description: res.error });
-                    }
-                } catch (err) {
-                    toast.error("Wipe Failed", { description: err.message });
-                }
-            }
-        });
-    };
 
     const handleSaveIntegrations = async () => {
         if (!isAdmin) return;
@@ -588,6 +604,88 @@ export default function Settings() {
                 }
             }
         });
+    };
+
+    // --- DATA EXPORT/IMPORT HANDLERS ---
+    const fileInputRef = useRef(null);
+
+    const triggerImportFlow = () => {
+        setConfirmDialog({
+            open: true,
+            title: "📥 START IMPORT PROCESS",
+            description: "You are about to import a backup file.\n\nNOTE ON DATA MERGING:\n• This defaults to a MERGE operation.\n• It adds new records and updates existing ones.\n• It does NOT delete 'junk' data (unless specifically overwritten).\n\nIf you want a pristine 1:1 restore (wiping old data first), please CANCEL and run 'Wipe Content' before importing.",
+            confirmKeyword: "IMPORT",
+            variant: "default",
+            onConfirm: () => {
+                // Trigger the file picker
+                if (fileInputRef.current) {
+                    fileInputRef.current.click();
+                }
+            }
+        });
+    };
+
+    const handleExportData = async () => {
+        setConfirmDialog({
+            open: true,
+            title: "💾 EXPORT SYSTEM DATA",
+            description: "This will download a JSON snapshot of your entire database (Posts, Ideas, Settings, Pillars).\n\nUse this file to migrate data or restore your system later.",
+            confirmKeyword: "EXPORT",
+            variant: "default", // Not destructive
+            onConfirm: async () => {
+                try {
+                    const data = await exportSystemData();
+                    const jsonString = JSON.stringify(data, null, 2);
+                    const blob = new Blob([jsonString], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `content_alchemy_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    toast.success("Backup Downloaded", { description: "Keep this file safe!" });
+                } catch (e) {
+                    toast.error("Export Failed", { description: e.message });
+                }
+            }
+        });
+    };
+
+    const handleImportData = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Reset the input value so the same file can be selected again if needed
+        event.target.value = '';
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                setConfirmDialog({
+                    open: true,
+                    title: "⚠️ DANGER: OVERWRITE DATA?",
+                    description: "You are about to RESTORE data from a backup file.\n\n• Existing items with the same ID will be OVERWRITTEN.\n• New items will be ADDED.\n• NOTHING will be deleted (unless the backup specifically overwrites it).\n\nIf you want a clean restore, please 'Wipe Content' first.",
+                    confirmKeyword: "OVERWRITE",
+                    variant: "destructive",
+                    onConfirm: async () => {
+                        const res = await restoreSystemData(json);
+                        if (res.success) {
+                            toast.success("System Restored", { description: "Data has been rehydrated." });
+                            setTimeout(() => window.location.reload(), 1500);
+                        } else {
+                            toast.error("Restore Failed", { description: res.error });
+                        }
+                    }
+                });
+            } catch (err) {
+                toast.error("Invalid Backup File");
+            }
+        };
+        reader.readAsText(file);
     };
 
     const handleAudit = async () => {
@@ -895,23 +993,7 @@ export default function Settings() {
                         </h1>
                         <p className="text-muted-foreground hidden md:block">Manage your application preferences and data.</p>
                     </div>
-                    {/* System Actions - ADMIN ONLY */}
-                    {isAdmin && (
-                        <div className="flex flex-row flex-wrap gap-2 w-full lg:w-auto">
-                            <Button variant="outline" onClick={handleDbAudit} title="Inspect Database State" className="flex-1 md:flex-none">
-                                <Database className="w-4 h-4 mr-2" />
-                                System Inspector
-                            </Button>
-                            <Button variant="outline" onClick={handleInitializeSystem} title="Restore Foundation Defaults (Pillars, Targets)" className="flex-1 md:flex-none">
-                                <Shield className="w-4 h-4 mr-2" />
-                                Initialize System Defaults
-                            </Button>
-                            <Button variant="destructive" onClick={handleClearPosts} title="Delete all Posts and Ideas (Reset Counters)" className="flex-1 md:flex-none">
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Clear Content Data
-                            </Button>
-                        </div>
-                    )}
+
                 </div>
 
                 {/* DB Audit Output Display */}
@@ -1507,6 +1589,75 @@ export default function Settings() {
                     </div>
                 )
             }
+
+            {/* Danger Zone */}
+            <div className="pt-8 border-t border-border/40">
+                <h3 className="text-lg font-bold flex items-center gap-2 text-primary mb-4">
+                    <AlertTriangle className="text-destructive w-5 h-5" />
+                    Danger Zone
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Backup & Recovery */}
+                    <div className="p-4 rounded-lg border border-destructive/20 bg-destructive/5 space-y-3">
+                        <h4 className="font-bold text-destructive flex items-center gap-2">
+                            <Database size={16} /> Backup & Recovery
+                        </h4>
+                        <p className="text-xs text-muted-foreground">Download a portable JSON snapshot of your entire database.</p>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleExportData}
+                                className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                            >
+                                Export Data
+                            </Button>
+
+                            {/* Hidden Input */}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".json"
+                                onChange={handleImportData}
+                                className="hidden"
+                            />
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={triggerImportFlow}
+                                className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                            >
+                                Import Data
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* System Reset */}
+                    <div className="p-4 rounded-lg border border-destructive/20 bg-destructive/5 space-y-3">
+                        <h4 className="font-bold text-destructive">System Reset</h4>
+                        <p className="text-xs text-muted-foreground">Wipe everything and reset to factory defaults.</p>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleInitializeSystem}
+                                disabled={initLoading}
+                            >
+                                {initLoading ? "Reseting..." : "Initialize System"}
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleClearPosts}
+                            >
+                                Wipe Content Only
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* Preview Modal */}
             <AlertPreviewModal
